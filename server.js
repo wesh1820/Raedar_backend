@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 const admin = require('firebase-admin');
-const serviceAccount = require('./service-account.json');
+const serviceAccount = JSON.parse(process.env.GOOGLE_CREDENTIALS);
 const User = require('./models/User'); // Import the User model
 const ticketRoutes = require('./routes/ticketRoutes'); // Import the ticket routes
 const eventRoutes = require('./routes/eventRoutes'); // Import the event routes
