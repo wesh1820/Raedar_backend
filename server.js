@@ -4,12 +4,22 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 const admin = require('firebase-admin');
-const serviceAccount = JSON.parse(process.env.GOOGLE_CREDENTIALS);
 const User = require('./models/User'); // Import the User model
 const ticketRoutes = require('./routes/ticketRoutes'); // Import the ticket routes
 const eventRoutes = require('./routes/eventRoutes'); // Import the event routes
 
+// Debugging step: print out environment variables to verify they're being loaded
+console.log('GCLOUD_PROJECT_ID:', process.env.GCLOUD_PROJECT_ID);
+console.log('GCLOUD_PRIVATE_KEY:', process.env.GCLOUD_PRIVATE_KEY);
+console.log('GCLOUD_CLIENT_EMAIL:', process.env.GCLOUD_CLIENT_EMAIL);
+
 // Initialize Firebase Admin
+const serviceAccount = {
+  projectId: process.env.GCLOUD_PROJECT_ID,
+  privateKey: process.env.GCLOUD_PRIVATE_KEY.replace(/\\n/g, '\n'), // Make sure newlines are replaced
+  clientEmail: process.env.GCLOUD_CLIENT_EMAIL
+};
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
