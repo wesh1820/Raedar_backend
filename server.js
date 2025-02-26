@@ -3,7 +3,7 @@ const path = require("path");
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
-const bcryptjs = require("bcryptjs"); // Change this line
+const bcryptjs = require("bcryptjs"); // Corrected import
 const jwt = require("jsonwebtoken");
 const User = require("./models/User");
 
@@ -38,7 +38,7 @@ app.post("/api/users", async (req, res) => {
     }
 
     // Hash the password before saving the user
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcryptjs.hash(password, 10); // Use bcryptjs
 
     // Create a new user
     user = new User({
