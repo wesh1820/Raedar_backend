@@ -3,13 +3,18 @@ const path = require("path");
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
-const bcryptjs = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const User = require("./models/User");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken"); // To generate the JWT for new users
+const User = require("./models/User"); // Import the User model
+const ticketRoutes = require("./routes/ticketRoutes"); // Import the ticket routes
+const eventRoutes = require("./routes/eventRoutes"); // Import the event routes
 
 const app = express();
 app.use(cors());
 app.use(express.json()); // For parsing JSON request bodies
+
+// Serve static files (images) from the "public/images" directory
+app.use("/images", express.static(path.join(__dirname, "public", "images")));
 
 // Connect to MongoDB
 mongoose
@@ -20,7 +25,7 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection failed:", err));
 
-// 🔹 PUBLIC ROUTE: Handle User Registration
+// 🔹 PUBLIC ROUTE: Handle User Registration and Login
 app.post("/api/users", async (req, res) => {
   const { email, password } = req.body;
 
@@ -38,7 +43,7 @@ app.post("/api/users", async (req, res) => {
     }
 
     // Hash the password before saving the user
-    const hashedPassword = await bcryptjs.hash(password, 10); // Use bcryptjs
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create a new user
     user = new User({
@@ -61,6 +66,13 @@ app.post("/api/users", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// 🔹 ROUTES
+// Event routes
+app.use("/api/events", eventRoutes);
+
+// Ticket routes
+app.use("/api/tickets", ticketRoutes); // This will handle the POST request for creating tickets
 
 // Start the server
 const PORT = process.env.PORT || 5001;
