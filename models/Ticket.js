@@ -20,7 +20,8 @@ const ticketSchema = new mongoose.Schema({
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // Verwijzing naar de 'User' collectie
+    ref: "User", // Reference to the User model
+    required: true, // Ensure every ticket is associated with a user
   },
 });
 
