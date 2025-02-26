@@ -1,47 +1,44 @@
-const express = require('express');
-const Ticket = require('../models/Ticket');
+const express = require("express");
+const Ticket = require("../models/Ticket");
+const jwt = require("jsonwebtoken");
 const router = express.Router();
 
-// POST /api/tickets - Create a new ticket
-router.post('/', async (req, res) => {
-  try {
-    const { type, price, availability } = req.body;
+// Middleware to verify the JWT token
+const verifyToken = (req, res, next) => {
+  const token = req.header("Authorization")?.replace("Bearer ", "");
 
-    // Create a new ticket
+  if (!token) {
+    return res.status(401).json({ error: "Access denied, token missing" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.userId; // Set the userId from token to request object
+    next(); // Proceed to the next middleware/route handler
+  } catch (err) {
+    res.status(400).json({ error: "Invalid token" });
+  }
+};
+
+// Create a new ticket (with userId)
+router.post("/", verifyToken, async (req, res) => {
+  const { type, price, availability } = req.body;
+  const userId = req.userId; // Get userId from the token
+
+  try {
+    // Create a new ticket and associate it with the user
     const newTicket = new Ticket({
       type,
       price,
       availability,
+      user: userId, // Link ticket to the user
     });
 
-    // Save the ticket to the database
-    await newTicket.save();
-
-    return res.status(200).json({
-      message: 'Ticket created successfully',
-      ticket: newTicket,
-    });
-  } catch (error) {
-    console.error('Error creating ticket:', error);
-    return res.status(500).json({ error: 'Failed to create ticket' });
-  }
-});
-
-// GET /api/tickets - Fetch all tickets
-router.get('/', async (req, res) => {
-  try {
-    // Fetch all tickets from the database
-    const tickets = await Ticket.find();
-
-    // If no tickets are found
-    if (!tickets || tickets.length === 0) {
-      return res.status(404).json({ message: 'No tickets found' });
-    }
-
-    return res.status(200).json(tickets);
-  } catch (error) {
-    console.error('Error fetching tickets:', error);
-    return res.status(500).json({ error: 'Failed to fetch tickets' });
+    const savedTicket = await newTicket.save();
+    res.status(200).json({ ticket: savedTicket });
+  } catch (err) {
+    console.error("❌ Error creating ticket:", err);
+    res.status(500).json({ error: "Error creating ticket" });
   }
 });
 

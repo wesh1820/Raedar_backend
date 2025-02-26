@@ -1,19 +1,24 @@
 const mongoose = require("mongoose");
 
-// Create a schema for the User model
+// User schema
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true, // Ensure email is unique
+    unique: true, // Zorg ervoor dat het email uniek is
   },
   password: {
     type: String,
     required: true,
   },
+  tickets: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Ticket", // Verwijzing naar de 'Ticket' collectie
+    },
+  ],
 });
 
-// Create the User model based on the schema
 const User = mongoose.model("User", userSchema);
 
 module.exports = User;
