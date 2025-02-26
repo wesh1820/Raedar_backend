@@ -3,6 +3,7 @@ const path = require("path");
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
+const bcrypt = require("bcryptjs");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("./models/User");
