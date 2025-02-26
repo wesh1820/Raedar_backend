@@ -101,6 +101,26 @@ app.get("/api/users", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+app.get("/api/tickets", async (req, res) => {
+  const token = req.headers["authorization"]; // Get token from the Authorization header
+
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify token
+    const userId = decoded.userId; // Get the userId from the token
+
+    // Retrieve the user's tickets and populate the 'user' field
+    const tickets = await Ticket.find({ user: userId }).populate("user");
+
+    res.json(tickets); // Send the tickets back
+  } catch (error) {
+    console.error("❌ Error fetching tickets:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // Routes for other resources (Events, Tickets)
 app.use("/api/events", eventRoutes);
