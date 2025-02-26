@@ -4,14 +4,14 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken"); // To generate the JWT for new users
-const User = require("./models/User"); // Import the User model
-const ticketRoutes = require("./routes/ticketRoutes"); // Import the ticket routes
-const eventRoutes = require("./routes/eventRoutes"); // Import the event routes
+const jwt = require("jsonwebtoken");
+const User = require("./models/User");
+const ticketRoutes = require("./routes/ticketRoutes");
+const eventRoutes = require("./routes/eventRoutes");
 
 const app = express();
 app.use(cors());
-app.use(express.json()); // For parsing JSON request bodies
+app.use(express.json());
 
 // Serve static files (images) from the "public/images" directory
 app.use("/images", express.static(path.join(__dirname, "public", "images")));
@@ -25,54 +25,86 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection failed:", err));
 
-// 🔹 PUBLIC ROUTE: Handle User Registration and Login
+// 🔹 USER ROUTES (POST /api/users for registration and login, GET /api/users for fetching user)
 app.post("/api/users", async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, action } = req.body; // Get 'action' from request body
 
-  // Check if email and password are provided
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
 
   try {
-    // Check if the user already exists in the database
-    let user = await User.findOne({ email });
+    if (action === "register") {
+      // Handle user registration
+      let user = await User.findOne({ email });
 
-    if (user) {
-      return res.status(400).json({ error: "User already exists" });
+      if (user) {
+        return res.status(400).json({ error: "User already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      user = new User({ email, password: hashedPassword });
+
+      await user.save();
+
+      const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+        expiresIn: "1h",
+      });
+
+      return res.json({ message: "User created successfully", token, user });
+    } else if (action === "login") {
+      // Handle user login
+      let user = await User.findOne({ email });
+
+      if (!user) {
+        return res.status(400).json({ error: "User does not exist" });
+      }
+
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ error: "Invalid credentials" });
+      }
+
+      const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+        expiresIn: "1h",
+      });
+
+      return res.json({ message: "Login successful", token, user });
+    } else {
+      return res.status(400).json({ error: "Invalid action" });
     }
-
-    // Hash the password before saving the user
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create a new user
-    user = new User({
-      email,
-      password: hashedPassword,
-    });
-
-    // Save the user to the database
-    await user.save();
-
-    // Generate a token for the new user
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h", // The token will expire in 1 hour
-    });
-
-    // Respond with the user's data and the token
-    return res.json({ message: "User created successfully", token, user });
   } catch (error) {
-    console.error("❌ Error creating user:", error);
+    console.error("❌ Error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// 🔹 ROUTES
-// Event routes
-app.use("/api/events", eventRoutes);
+// 🔹 GET ROUTE to fetch the user details (user profile)
+app.get("/api/users", async (req, res) => {
+  const token = req.headers["authorization"]; // Assuming the token is passed in the authorization header as Bearer <token>
 
-// Ticket routes
-app.use("/api/tickets", ticketRoutes); // This will handle the POST request for creating tickets
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ email: user.email, id: user._id });
+  } catch (error) {
+    console.error("❌ Error fetching user details:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Routes for other resources (Events, Tickets)
+app.use("/api/events", eventRoutes);
+app.use("/api/tickets", ticketRoutes);
 
 // Start the server
 const PORT = process.env.PORT || 5001;
