@@ -9,14 +9,20 @@ const router = express.Router();
 router.post("/", async (req, res) => {
   const { type, price, availability } = req.body;
 
-  const token = req.headers["authorization"]; // Get token from the Authorization header
-
-  if (!token) {
+  const token = req.headers["authorization"];
+  if (!token || !token.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
+  const jwtToken = token.split(" ")[1]; // Extract the token part
+
+  if (!type || !price || !availability) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(jwtToken, process.env.JWT_SECRET);
+    console.log("Decoded JWT:", decoded); // Add this for debugging
     const userId = decoded.userId;
 
     // Create a new ticket for the logged-in user
@@ -40,7 +46,12 @@ router.post("/", async (req, res) => {
       .json({ message: "Ticket created successfully", ticket: newTicket });
   } catch (error) {
     console.error("Error creating ticket:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+    return res
+      .status(500)
+      .json({ error: "Internal server error", details: error.message });
   }
 });
 
