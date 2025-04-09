@@ -1,44 +1,24 @@
-const express = require("express");
-const User = require("../models/User"); // Your User model
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const router = express.Router();
+const mongoose = require("mongoose");
 
-router.post("/api/users", async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res
-      .status(400)
-      .json({ message: "Email and password are required." });
-  }
-
-  try {
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email already in use." });
-    }
-
-    // Create a new user
-    const user = new User({
-      email,
-      password,
-    });
-
-    // Save the user to the database
-    await user.save();
-
-    // Create a JWT token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
-
-    // Send the token back in the response
-    res.status(201).json({ message: "User created successfully", token });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Internal server error" });
-  }
+// User schema
+const userSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true, // Zorg ervoor dat het email uniek is
+  },
+  password: {
+    type: String,
+    required: true,
+  },
+  tickets: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Ticket", // Verwijzing naar de 'Ticket' collectie
+    },
+  ],
 });
 
-module.exports = router;
+const User = mongoose.model("User", userSchema);
+
+module.exports = User;
