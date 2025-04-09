@@ -1,10 +1,13 @@
+// server/routes/userRoutes.js
 const express = require("express");
-const User = require("../models/User"); // Your User model
+const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+
 const router = express.Router();
 
-router.post("/api/users", async (req, res) => {
+// POST: Register a new user
+router.post("/", async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -14,29 +17,30 @@ router.post("/api/users", async (req, res) => {
   }
 
   try {
+    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: "Email already in use." });
+      return res.status(400).json({ message: "Email is already in use." });
     }
 
-    // Create a new user
-    const user = new User({
-      email,
-      password,
-    });
+    // Hash the password before saving
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create new user
+    const newUser = new User({ email, password: hashedPassword });
 
     // Save the user to the database
-    await user.save();
+    await newUser.save();
 
-    // Create a JWT token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+    // Create a JWT token for the user
+    const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
 
-    // Send the token back in the response
+    // Send back the token
     res.status(201).json({ message: "User created successfully", token });
   } catch (error) {
-    console.error(error);
+    console.error("Error registering user:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
