@@ -4,7 +4,7 @@ const User = require("../models/User"); // Import User model
 const jwt = require("jsonwebtoken");
 const router = express.Router();
 
-// Middleware to verify the JWT token
+// ✅ Middleware om de JWT token te valideren
 const verifyToken = (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
 
@@ -14,30 +14,41 @@ const verifyToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId; // Set the userId from token to request object
-    next(); // Proceed to the next middleware/route handler
+    req.userId = decoded.userId; // Zet userId in req object
+    next();
   } catch (err) {
     res.status(400).json({ error: "Invalid token" });
   }
 };
 
-// Create a new ticket (with userId)
+// ✅ GET: Haal alle tickets op voor de ingelogde gebruiker
+router.get("/", verifyToken, async (req, res) => {
+  try {
+    const tickets = await Ticket.find({ user: req.userId });
+    res.status(200).json({ tickets });
+  } catch (err) {
+    console.error("❌ Error fetching tickets:", err);
+    res.status(500).json({ error: "Fout bij ophalen van tickets" });
+  }
+});
+
+// ✅ POST: Maak een nieuw ticket aan voor de gebruiker
 router.post("/", verifyToken, async (req, res) => {
   const { type, price, availability } = req.body;
   const userId = req.userId;
 
   try {
-    // Create a new ticket and associate it with the user
+    // Maak een nieuw ticket aan
     const newTicket = new Ticket({
       type,
       price,
       availability,
-      user: userId, // Link ticket to the user
+      user: userId,
     });
 
     const savedTicket = await newTicket.save();
 
-    // Update user's tickets array by adding the new ticket's id
+    // Voeg het ticket toe aan de gebruiker
     await User.findByIdAndUpdate(userId, {
       $push: { tickets: savedTicket._id },
     });
