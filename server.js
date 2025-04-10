@@ -6,6 +6,7 @@ require("dotenv").config();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("./models/User");
+const Ticket = require("./models/Ticket");
 const ticketRoutes = require("./routes/ticketRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 
@@ -27,7 +28,7 @@ mongoose
 
 // 🔹 USER ROUTES (POST /api/users for registration and login, GET /api/users for fetching user)
 app.post("/api/users", async (req, res) => {
-  const { email, password, action } = req.body; // Get 'action' from request body
+  const { email, password, action } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
@@ -35,7 +36,6 @@ app.post("/api/users", async (req, res) => {
 
   try {
     if (action === "register") {
-      // Handle user registration
       let user = await User.findOne({ email });
 
       if (user) {
@@ -53,7 +53,6 @@ app.post("/api/users", async (req, res) => {
 
       return res.json({ message: "User created successfully", token, user });
     } else if (action === "login") {
-      // Handle user login
       let user = await User.findOne({ email });
 
       if (!user) {
@@ -81,7 +80,7 @@ app.post("/api/users", async (req, res) => {
 
 // 🔹 GET ROUTE to fetch the user details (user profile)
 app.get("/api/users", async (req, res) => {
-  const token = req.headers["authorization"]; // Assuming the token is passed in the authorization header as Bearer <token>
+  const token = req.headers["authorization"];
 
   if (!token) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -101,7 +100,9 @@ app.get("/api/users", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
-app.get("/api/tickets", async (req, res) => {
+
+// 🔹 Tickets route
+app.get("/api/users/tickets", async (req, res) => {
   const token = req.headers["authorization"]; // Get token from the Authorization header
 
   if (!token) {
@@ -112,17 +113,21 @@ app.get("/api/tickets", async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify token
     const userId = decoded.userId; // Get the userId from the token
 
-    // Retrieve the user's tickets and populate the 'user' field
-    const tickets = await Ticket.find({ user: userId }).populate("user");
+    // Fetch user and populate their tickets
+    const user = await User.findById(userId).populate("tickets");
 
-    res.json(tickets); // Send the tickets back
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(user.tickets); // Send the user's tickets back
   } catch (error) {
     console.error("❌ Error fetching tickets:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Routes for other resources (Events, Tickets)
+// Routes for events and tickets
 app.use("/api/events", eventRoutes);
 app.use("/api/tickets", ticketRoutes);
 

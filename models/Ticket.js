@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-// Ticket schema
 const ticketSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -20,8 +19,8 @@ const ticketSchema = new mongoose.Schema({
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // Reference to the User model
-    required: true, // Ensure every ticket is associated with a user
+    ref: "User",
+    required: true,
   },
 });
 
