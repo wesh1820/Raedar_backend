@@ -1,46 +1,44 @@
 const express = require("express");
 const Ticket = require("../models/Ticket");
-const User = require("../models/User");
 const jwt = require("jsonwebtoken");
-
 const router = express.Router();
 
-// Route to create a new ticket for a logged-in user
-router.post("/", async (req, res) => {
-  const { type, price, availability } = req.body;
-
-  const token = req.headers["authorization"]; // Get token from the Authorization header
+// Middleware to verify the JWT token
+const verifyToken = (req, res, next) => {
+  const token = req.header("Authorization")?.replace("Bearer ", "");
 
   if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({ error: "Access denied, token missing" });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.userId;
+    req.userId = decoded.userId; // Set the userId from token to request object
+    next(); // Proceed to the next middleware/route handler
+  } catch (err) {
+    res.status(400).json({ error: "Invalid token" });
+  }
+};
 
-    // Create a new ticket for the logged-in user
+// Create a new ticket (with userId)
+router.post("/", verifyToken, async (req, res) => {
+  const { type, price, availability } = req.body;
+  const userId = req.userId; // Get userId from the token
+
+  try {
+    // Create a new ticket and associate it with the user
     const newTicket = new Ticket({
       type,
       price,
       availability,
-      user: userId, // Associate ticket with the logged-in user
+      user: userId, // Link ticket to the user
     });
 
-    // Save the ticket to the database
-    await newTicket.save();
-
-    // Optionally, update the User's tickets array
-    await User.findByIdAndUpdate(userId, {
-      $push: { tickets: newTicket._id }, // Add the ticket to the user's tickets array
-    });
-
-    res
-      .status(201)
-      .json({ message: "Ticket created successfully", ticket: newTicket });
-  } catch (error) {
-    console.error("Error creating ticket:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    const savedTicket = await newTicket.save();
+    res.status(200).json({ ticket: savedTicket });
+  } catch (err) {
+    console.error("❌ Error creating ticket:", err);
+    res.status(500).json({ error: "Error creating ticket" });
   }
 });
 
