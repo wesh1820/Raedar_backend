@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 // Event Schema
 const eventSchema = new mongoose.Schema({
@@ -7,6 +7,6 @@ const eventSchema = new mongoose.Schema({
   imageUrl: { type: String }, // Optional
 });
 
-const Event = mongoose.model('Event', eventSchema);
+const Event = mongoose.model("Event", eventSchema);
 
 module.exports = Event;
