@@ -1,5 +1,6 @@
 const express = require("express");
 const Ticket = require("../models/Ticket");
+const User = require("../models/User"); // Import User model
 const jwt = require("jsonwebtoken");
 const router = express.Router();
 
@@ -23,7 +24,7 @@ const verifyToken = (req, res, next) => {
 // Create a new ticket (with userId)
 router.post("/", verifyToken, async (req, res) => {
   const { type, price, availability } = req.body;
-  const userId = req.userId; // Get userId from the token
+  const userId = req.userId;
 
   try {
     // Create a new ticket and associate it with the user
@@ -35,6 +36,12 @@ router.post("/", verifyToken, async (req, res) => {
     });
 
     const savedTicket = await newTicket.save();
+
+    // Update user's tickets array by adding the new ticket's id
+    await User.findByIdAndUpdate(userId, {
+      $push: { tickets: savedTicket._id },
+    });
+
     res.status(200).json({ ticket: savedTicket });
   } catch (err) {
     console.error("❌ Error creating ticket:", err);
