@@ -13,6 +13,11 @@ const ticketSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  duration: {
+    // Voeg het duration veld toe
+    type: Number,
+    required: true, // Maak het een verplicht veld
+  },
   createdAt: {
     type: Date,
     default: Date.now,

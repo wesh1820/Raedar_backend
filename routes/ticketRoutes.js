@@ -34,8 +34,13 @@ router.get("/", verifyToken, async (req, res) => {
 
 // ✅ POST: Maak een nieuw ticket aan voor de gebruiker
 router.post("/", verifyToken, async (req, res) => {
-  const { type, price, availability } = req.body;
+  const { type, price, availability, duration } = req.body; // Zorg ervoor dat je 'duration' hier ontvangt
   const userId = req.userId;
+
+  if (!duration) {
+    // Voeg een check toe voor de duur
+    return res.status(400).json({ error: "Duration is required" });
+  }
 
   try {
     // Maak een nieuw ticket aan
@@ -43,6 +48,7 @@ router.post("/", verifyToken, async (req, res) => {
       type,
       price,
       availability,
+      duration, // Voeg de duur toe aan het ticket
       user: userId,
     });
 
