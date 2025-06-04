@@ -44,24 +44,45 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// 🔹 USER ROUTES (POST /api/users for registration and login)
+// 🔹 USER ROUTES – REGISTREER / LOGIN via telefoonnummer
 app.post("/api/users", async (req, res) => {
-  const { email, password, action } = req.body;
+  const { email, password, action, username, phoneNumber } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
+  if (
+    !password ||
+    (action === "register" && (!email || !username || !phoneNumber))
+  ) {
+    return res.status(400).json({ error: "Verplichte velden ontbreken" });
   }
 
   try {
     if (action === "register") {
-      let user = await User.findOne({ email });
+      const existingEmail = await User.findOne({ email });
+      const existingUsername = await User.findOne({ username });
+      const existingPhone = await User.findOne({ phoneNumber });
 
-      if (user) {
-        return res.status(400).json({ error: "User already exists" });
+      if (existingEmail) {
+        return res.status(400).json({ error: "E-mailadres is al in gebruik" });
+      }
+      if (existingUsername) {
+        return res
+          .status(400)
+          .json({ error: "Gebruikersnaam is al in gebruik" });
+      }
+      if (existingPhone) {
+        return res
+          .status(400)
+          .json({ error: "Telefoonnummer is al in gebruik" });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      user = new User({ email, password: hashedPassword });
+
+      const user = new User({
+        email,
+        username,
+        phoneNumber,
+        password: hashedPassword,
+      });
 
       await user.save();
 
@@ -69,64 +90,78 @@ app.post("/api/users", async (req, res) => {
         expiresIn: "1h",
       });
 
-      return res.json({ message: "User created successfully", token, user });
+      return res.json({
+        message: "Gebruiker succesvol aangemaakt",
+        token,
+        user,
+      });
     } else if (action === "login") {
-      let user = await User.findOne({ email });
+      if (!phoneNumber) {
+        return res
+          .status(400)
+          .json({ error: "Telefoonnummer is vereist om in te loggen" });
+      }
 
+      const user = await User.findOne({ phoneNumber });
       if (!user) {
-        return res.status(400).json({ error: "User does not exist" });
+        return res
+          .status(400)
+          .json({ error: "Gebruiker met dit nummer bestaat niet" });
       }
 
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        return res.status(400).json({ error: "Invalid credentials" });
+        return res.status(400).json({ error: "Ongeldig wachtwoord" });
       }
 
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
         expiresIn: "1h",
       });
 
-      return res.json({ message: "Login successful", token, user });
+      return res.json({ message: "Login gelukt", token, user });
     } else {
-      return res.status(400).json({ error: "Invalid action" });
+      return res.status(400).json({ error: "Ongeldige actie" });
     }
   } catch (error) {
-    console.error("❌ Error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Fout:", error);
+    return res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
-// 🔹 GET ROUTE to fetch the user profile
+// 🔹 GET USER PROFIEL
 app.get("/api/users", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
     res.json(user);
   } catch (error) {
-    console.error("❌ Error fetching user details:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Fout bij ophalen gebruiker:", error);
+    res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
-// 🔹 GET user's tickets
+// 🔹 GET USER TICKETS
 app.get("/api/users/tickets", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId).populate("tickets");
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
     res.json(user.tickets);
   } catch (error) {
-    console.error("❌ Error fetching tickets:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Fout bij ophalen tickets:", error);
+    res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
-// 🔹 Activate Premium
+// 🔹 PREMIUM ACTIVEREN
 app.post("/api/users/premium", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
     user.premium = true;
     user.premiumCancelPending = false;
@@ -134,36 +169,37 @@ app.post("/api/users/premium", authenticateToken, async (req, res) => {
 
     res.json({ success: true, message: "Premium geactiveerd!" });
   } catch (error) {
-    console.error("❌ Error activating premium:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Fout bij premium activeren:", error);
+    res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
-// 🔹 Cancel Premium
+// 🔹 PREMIUM STOPZETTEN
 app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
     user.premiumCancelPending = true;
     await user.save();
 
     res.json({
       success: true,
-      message: "Premium abonnement wordt stopgezet na deze maand.",
+      message: "Premium wordt stopgezet aan het eind van deze maand.",
     });
   } catch (error) {
-    console.error("❌ Error canceling premium:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Fout bij premium annuleren:", error);
+    res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
-// Routes voor events en tickets
+// 🔹 Routes voor events en tickets
 app.use("/api/events", eventRoutes);
 app.use("/api/tickets", ticketRoutes);
 
-// Start de server
+// 🔹 Server starten
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Server draait op poort ${PORT}`);
 });
