@@ -5,19 +5,22 @@ const cors = require("cors");
 require("dotenv").config();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+
 const User = require("./models/User");
 const Ticket = require("./models/Ticket");
 const ticketRoutes = require("./routes/ticketRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Serve static files (images) from the "public/images" directory
+// Serve static files (zoals afbeeldingen) uit public/images
 app.use("/images", express.static(path.join(__dirname, "public", "images")));
 
-// Connect to MongoDB
+// MongoDB connectie
 mongoose
   .connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
@@ -26,7 +29,9 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection failed:", err));
 
-// 🔹 USER ROUTES (POST /api/users for registration and login, GET /api/users for fetching user)
+// USER ROUTES
+
+// Register en Login (POST /api/users)
 app.post("/api/users", async (req, res) => {
   const { email, password, action } = req.body;
 
@@ -37,7 +42,6 @@ app.post("/api/users", async (req, res) => {
   try {
     if (action === "register") {
       let user = await User.findOne({ email });
-
       if (user) {
         return res.status(400).json({ error: "User already exists" });
       }
@@ -54,7 +58,6 @@ app.post("/api/users", async (req, res) => {
       return res.json({ message: "User created successfully", token, user });
     } else if (action === "login") {
       let user = await User.findOne({ email });
-
       if (!user) {
         return res.status(400).json({ error: "User does not exist" });
       }
@@ -78,17 +81,13 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
-// 🔹 Endpoint om premium te activeren
+// Premium activeren (POST /api/users/premium)
 app.post("/api/users/premium", async (req, res) => {
   const authHeader = req.headers["authorization"];
-  if (!authHeader) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
 
   const token = authHeader.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -111,60 +110,48 @@ app.post("/api/users/premium", async (req, res) => {
   }
 });
 
-// 🔹 GET ROUTE to fetch the user details (user profile)
+// User details ophalen (GET /api/users)
 app.get("/api/users", async (req, res) => {
   const token = req.headers["authorization"];
-
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId);
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json({ email: user.email, id: user._id });
+    res.json({ email: user.email, id: user._id, premium: user.premium });
   } catch (error) {
     console.error("❌ Error fetching user details:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// 🔹 Tickets route
+// Tickets ophalen van gebruiker (GET /api/users/tickets)
 app.get("/api/users/tickets", async (req, res) => {
-  const token = req.headers["authorization"]; // Get token from the Authorization header
-
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  const token = req.headers["authorization"];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify token
-    const userId = decoded.userId; // Get the userId from the token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId;
 
-    // Fetch user and populate their tickets
     const user = await User.findById(userId).populate("tickets");
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    res.json(user.tickets); // Send the user's tickets back
+    res.json(user.tickets);
   } catch (error) {
     console.error("❌ Error fetching tickets:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Routes for events and tickets
+// Routes voor events en tickets
 app.use("/api/events", eventRoutes);
 app.use("/api/tickets", ticketRoutes);
 
-// Start the server
+// Server starten
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
