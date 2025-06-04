@@ -5,6 +5,7 @@ const cors = require("cors");
 require("dotenv").config();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+
 const User = require("./models/User");
 const Ticket = require("./models/Ticket");
 const ticketRoutes = require("./routes/ticketRoutes");
@@ -26,7 +27,24 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection failed:", err));
 
-// 🔹 USER ROUTES (POST /api/users for registration and login, GET /api/users for fetching user)
+// Helper middleware om token te verifiëren
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+
+  const token = authHeader.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.userId;
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: "Invalid token" });
+  }
+};
+
+// 🔹 USER ROUTES (POST /api/users for registration and login)
 app.post("/api/users", async (req, res) => {
   const { email, password, action } = req.body;
 
@@ -78,60 +96,73 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
-// 🔹 GET ROUTE to fetch the user details (user profile)
-app.get("/api/users", async (req, res) => {
-  const token = req.headers["authorization"];
-
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
+// 🔹 GET ROUTE to fetch the user profile
+app.get("/api/users", authenticateToken, async (req, res) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(req.userId).select("-password");
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    res.json({ email: user.email, id: user._id });
+    res.json(user);
   } catch (error) {
     console.error("❌ Error fetching user details:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// 🔹 Tickets route
-app.get("/api/users/tickets", async (req, res) => {
-  const token = req.headers["authorization"]; // Get token from the Authorization header
-
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
+// 🔹 GET user's tickets
+app.get("/api/users/tickets", authenticateToken, async (req, res) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify token
-    const userId = decoded.userId; // Get the userId from the token
+    const user = await User.findById(req.userId).populate("tickets");
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Fetch user and populate their tickets
-    const user = await User.findById(userId).populate("tickets");
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    res.json(user.tickets); // Send the user's tickets back
+    res.json(user.tickets);
   } catch (error) {
     console.error("❌ Error fetching tickets:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Routes for events and tickets
+// 🔹 Activate Premium
+app.post("/api/users/premium", authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    user.premium = true;
+    user.premiumCancelPending = false;
+    await user.save();
+
+    res.json({ success: true, message: "Premium geactiveerd!" });
+  } catch (error) {
+    console.error("❌ Error activating premium:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// 🔹 Cancel Premium
+app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    user.premiumCancelPending = true;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Premium abonnement wordt stopgezet na deze maand.",
+    });
+  } catch (error) {
+    console.error("❌ Error canceling premium:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Routes voor events en tickets
 app.use("/api/events", eventRoutes);
 app.use("/api/tickets", ticketRoutes);
 
-// Start the server
+// Start de server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
