@@ -1,11 +1,10 @@
 const mongoose = require("mongoose");
 
-// User schema
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true, // Zorg ervoor dat het email uniek is
+    unique: true,
   },
   password: {
     type: String,
@@ -14,12 +13,16 @@ const userSchema = new mongoose.Schema({
   tickets: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Ticket", // Verwijzing naar de 'Ticket' collectie
+      ref: "Ticket",
     },
   ],
   premium: {
     type: Boolean,
-    default: false, // Standaard geen premium
+    default: false,
+  },
+  premiumCancelPending: {
+    type: Boolean,
+    default: false, // true als user premium wil opzeggen maar nog in looptijd zit
   },
 });
 
