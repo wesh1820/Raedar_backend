@@ -31,13 +31,24 @@ router.post("/", async (req, res) => {
     }
 
     try {
-      const existingUser = await User.findOne({
-        $or: [{ email }, { username }],
-      });
-      if (existingUser) {
-        return res.status(400).json({
-          error: "Gebruiker met dit e-mailadres of gebruikersnaam bestaat al.",
-        });
+      // Check of email, username of telefoonnummer al bestaan
+      const existingEmail = await User.findOne({ email });
+      if (existingEmail) {
+        return res.status(400).json({ error: "E-mailadres is al in gebruik." });
+      }
+
+      const existingUsername = await User.findOne({ username });
+      if (existingUsername) {
+        return res
+          .status(400)
+          .json({ error: "Gebruikersnaam is al in gebruik." });
+      }
+
+      const existingPhone = await User.findOne({ phoneNumber });
+      if (existingPhone) {
+        return res
+          .status(400)
+          .json({ error: "Telefoonnummer is al in gebruik." });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -61,14 +72,14 @@ router.post("/", async (req, res) => {
       return res.status(500).json({ error: "Interne serverfout" });
     }
   } else if (action === "login") {
-    if (!email || !password) {
+    if (!phoneNumber || !password) {
       return res
         .status(400)
-        .json({ error: "E-mail en wachtwoord zijn verplicht." });
+        .json({ error: "Telefoonnummer en wachtwoord zijn verplicht." });
     }
 
     try {
-      const user = await User.findOne({ email });
+      const user = await User.findOne({ phoneNumber });
       if (!user) {
         return res.status(400).json({ error: "Gebruiker bestaat niet." });
       }
