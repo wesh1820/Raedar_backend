@@ -17,6 +17,10 @@ const userSchema = new mongoose.Schema({
       ref: "Ticket", // Verwijzing naar de 'Ticket' collectie
     },
   ],
+  premium: {
+    type: Boolean,
+    default: false, // Standaard geen premium
+  },
 });
 
 const User = mongoose.model("User", userSchema);

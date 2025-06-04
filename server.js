@@ -78,6 +78,39 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
+// 🔹 Endpoint om premium te activeren
+app.post("/api/users/premium", async (req, res) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    user.premium = true;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Premium account geactiveerd",
+      user: { email: user.email, premium: user.premium },
+    });
+  } catch (error) {
+    console.error("❌ Error activating premium:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // 🔹 GET ROUTE to fetch the user details (user profile)
 app.get("/api/users", async (req, res) => {
   const token = req.headers["authorization"];
