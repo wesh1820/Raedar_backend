@@ -6,6 +6,15 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  phoneNumber: {
+    type: String,
+    required: true,
+  },
   password: {
     type: String,
     required: true,
@@ -22,7 +31,7 @@ const userSchema = new mongoose.Schema({
   },
   premiumCancelPending: {
     type: Boolean,
-    default: false, // true als user premium wil opzeggen maar nog in looptijd zit
+    default: false,
   },
 });
 

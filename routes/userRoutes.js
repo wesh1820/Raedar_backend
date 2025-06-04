@@ -4,10 +4,11 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const User = require("../models/User");
 
-// Helper middleware om user via token te authenticeren
+// Middleware voor authenticatie via JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+
   const token = authHeader.split(" ")[1];
   if (!token) return res.status(401).json({ error: "Unauthorized" });
 
@@ -22,70 +23,94 @@ const authenticateToken = (req, res, next) => {
 
 // Register & login endpoint
 router.post("/", async (req, res) => {
-  const { email, password, action } = req.body;
+  const { email, password, username, phoneNumber, action } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
-  }
+  if (action === "register") {
+    if (!email || !password || !username || !phoneNumber) {
+      return res.status(400).json({ error: "Alle velden zijn verplicht." });
+    }
 
-  try {
-    if (action === "register") {
-      let user = await User.findOne({ email });
-      if (user) {
-        return res.status(400).json({ error: "User already exists" });
+    try {
+      const existingUser = await User.findOne({
+        $or: [{ email }, { username }],
+      });
+      if (existingUser) {
+        return res.status(400).json({
+          error: "Gebruiker met dit e-mailadres of gebruikersnaam bestaat al.",
+        });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      user = new User({ email, password: hashedPassword });
+
+      const user = new User({
+        email,
+        password: hashedPassword,
+        username,
+        phoneNumber,
+      });
+
       await user.save();
 
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
         expiresIn: "1h",
       });
 
-      return res.json({ message: "User created successfully", token, user });
-    } else if (action === "login") {
-      let user = await User.findOne({ email });
+      return res.json({ message: "Account succesvol aangemaakt", token, user });
+    } catch (error) {
+      console.error("❌ Fout bij registratie:", error);
+      return res.status(500).json({ error: "Interne serverfout" });
+    }
+  } else if (action === "login") {
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ error: "E-mail en wachtwoord zijn verplicht." });
+    }
+
+    try {
+      const user = await User.findOne({ email });
       if (!user) {
-        return res.status(400).json({ error: "User does not exist" });
+        return res.status(400).json({ error: "Gebruiker bestaat niet." });
       }
 
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        return res.status(400).json({ error: "Invalid credentials" });
+        return res.status(400).json({ error: "Ongeldige inloggegevens." });
       }
 
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
         expiresIn: "1h",
       });
 
-      return res.json({ message: "Login successful", token, user });
-    } else {
-      return res.status(400).json({ error: "Invalid action" });
+      return res.json({ message: "Inloggen gelukt", token, user });
+    } catch (error) {
+      console.error("❌ Fout bij inloggen:", error);
+      return res.status(500).json({ error: "Interne serverfout" });
     }
-  } catch (error) {
-    console.error("❌ Error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+  } else {
+    return res.status(400).json({ error: "Ongeldige actie" });
   }
 });
 
-// Get user profile
+// Profiel ophalen
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
     res.json(user);
   } catch (error) {
-    console.error("❌ Error fetching user details:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Fout bij ophalen profiel:", error);
+    res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
-// Premium kopen endpoint
+// Premium activeren
 router.post("/premium", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
     user.premium = true;
     user.premiumCancelPending = false;
@@ -93,16 +118,17 @@ router.post("/premium", authenticateToken, async (req, res) => {
 
     res.json({ success: true, message: "Premium geactiveerd!" });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Fout bij activeren premium:", error);
+    res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
-// Premium annuleren endpoint
+// Premium annuleren
 router.post("/premium/cancel", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
     user.premiumCancelPending = true;
     await user.save();
@@ -112,8 +138,8 @@ router.post("/premium/cancel", authenticateToken, async (req, res) => {
       message: "Premium abonnement wordt stopgezet na deze maand.",
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Fout bij annuleren premium:", error);
+    res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
