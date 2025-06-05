@@ -39,6 +39,14 @@ const userSchema = new mongoose.Schema({
     enum: ["month", "year"],
     default: null,
   },
+  premiumStartDate: {
+    type: Date,
+    default: null,
+  },
+  premiumEndDate: {
+    type: Date,
+    default: null,
+  },
   premiumCancelPending: {
     type: Boolean,
     default: false,
