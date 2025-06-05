@@ -89,6 +89,20 @@ router.post("/", async (req, res) => {
         return res.status(400).json({ error: "Ongeldige inloggegevens." });
       }
 
+      // Controleer of premium verlopen is of premiumEndDate ontbreekt
+      const now = new Date();
+
+      if (user.premium) {
+        if (!user.premiumEndDate || user.premiumEndDate <= now) {
+          user.premium = false;
+          user.premiumType = null;
+          user.premiumStartDate = null;
+          user.premiumEndDate = null;
+          user.premiumCancelPending = false;
+          await user.save();
+        }
+      }
+
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
         expiresIn: "1h",
       });
@@ -158,7 +172,7 @@ router.post("/password", authenticateToken, async (req, res) => {
   }
 });
 
-// Bijvoorbeeld in je premium activatie endpoint:
+// Premium activeren
 router.post("/premium", authenticateToken, async (req, res) => {
   const { premiumType } = req.body; // "month" of "year"
 
