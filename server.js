@@ -113,7 +113,7 @@ app.post("/api/users", async (req, res) => {
       if (!isMatch)
         return res.status(400).json({ error: "Ongeldig wachtwoord" });
 
-      // **Premium abonnement altijd uitzetten als verlopen**
+      // Premium automatisch uitzetten als verlopen
       const now = new Date();
       if (user.premium && user.premiumEndDate && user.premiumEndDate <= now) {
         user.premium = false;
@@ -138,7 +138,7 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
-// Get user profile (without password)
+// Get user profile (zonder password)
 app.get("/api/users", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
