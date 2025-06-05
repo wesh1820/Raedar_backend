@@ -158,9 +158,9 @@ router.post("/password", authenticateToken, async (req, res) => {
   }
 });
 
-// Premium activeren
+// Bijvoorbeeld in je premium activatie endpoint:
 router.post("/premium", authenticateToken, async (req, res) => {
-  const { premiumType } = req.body; // verwacht "month" of "year"
+  const { premiumType } = req.body; // "month" of "year"
 
   if (!premiumType || !["month", "year"].includes(premiumType)) {
     return res.status(400).json({ error: "Ongeldig premium type" });
@@ -171,14 +171,29 @@ router.post("/premium", authenticateToken, async (req, res) => {
     if (!user)
       return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
+    const now = new Date();
+    let premiumEndDate;
+
+    if (premiumType === "month") {
+      premiumEndDate = new Date(now);
+      premiumEndDate.setMonth(premiumEndDate.getMonth() + 1);
+    } else if (premiumType === "year") {
+      premiumEndDate = new Date(now);
+      premiumEndDate.setFullYear(premiumEndDate.getFullYear() + 1);
+    }
+
     user.premium = true;
     user.premiumType = premiumType;
+    user.premiumStartDate = now;
+    user.premiumEndDate = premiumEndDate;
     user.premiumCancelPending = false;
+
     await user.save();
 
     res.json({
       success: true,
-      message: `Premium (${premiumType}) geactiveerd!`,
+      message: `Premium (${premiumType}) geactiveerd tot ${premiumEndDate.toISOString()}`,
+      premiumEndDate,
     });
   } catch (error) {
     console.error("❌ Fout bij activeren premium:", error);

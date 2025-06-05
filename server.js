@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const cron = require("node-cron");
 require("dotenv").config();
 
 const User = require("./models/User");
@@ -112,6 +113,19 @@ app.post("/api/users", async (req, res) => {
       if (!isMatch)
         return res.status(400).json({ error: "Ongeldig wachtwoord" });
 
+      // Check of premium verlopen is en annuleer indien nodig
+      const now = new Date();
+      if (user.premium && user.premiumEndDate && user.premiumEndDate <= now) {
+        if (user.premiumCancelPending) {
+          user.premium = false;
+          user.premiumType = null;
+          user.premiumStartDate = null;
+          user.premiumEndDate = null;
+          user.premiumCancelPending = false;
+          await user.save();
+        }
+      }
+
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
         expiresIn: "1h",
       });
@@ -209,14 +223,29 @@ app.post("/api/users/premium", authenticateToken, async (req, res) => {
     if (!user)
       return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
+    const now = new Date();
+    let premiumEndDate;
+
+    if (premiumType === "month") {
+      premiumEndDate = new Date(now);
+      premiumEndDate.setMonth(premiumEndDate.getMonth() + 1);
+    } else if (premiumType === "year") {
+      premiumEndDate = new Date(now);
+      premiumEndDate.setFullYear(premiumEndDate.getFullYear() + 1);
+    }
+
     user.premium = true;
     user.premiumType = premiumType;
+    user.premiumStartDate = now;
+    user.premiumEndDate = premiumEndDate;
     user.premiumCancelPending = false;
+
     await user.save();
 
     res.json({
       success: true,
-      message: `Premium (${premiumType}) geactiveerd!`,
+      message: `Premium (${premiumType}) geactiveerd tot ${premiumEndDate.toISOString()}`,
+      premiumEndDate,
     });
   } catch (error) {
     console.error("❌ Fout bij premium activeren:", error);
@@ -231,12 +260,19 @@ app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
     if (!user)
       return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
+    if (!user.premium) {
+      return res
+        .status(400)
+        .json({ error: "Gebruiker heeft geen actief premium abonnement" });
+    }
+
     user.premiumCancelPending = true;
     await user.save();
 
     res.json({
       success: true,
-      message: "Premium wordt stopgezet aan het eind van deze maand.",
+      message:
+        "Premium annulering is gemarkeerd. Premium blijft actief tot het einde van de periode.",
     });
   } catch (error) {
     console.error("❌ Fout bij premium annuleren:", error);
@@ -244,12 +280,39 @@ app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
   }
 });
 
-// ───── OTHER ROUTES ─────
-app.use("/api/events", eventRoutes);
+// ───── TICKET & EVENT ROUTES ─────
 app.use("/api/tickets", ticketRoutes);
+app.use("/api/events", eventRoutes);
 
-// ───── START SERVER ─────
-const PORT = process.env.PORT || 5001;
+// ───── CRONJOB VOOR PREMIUM VERVAL ─────
+// Draait elke dag om middernacht om verlopen premium abonnementen uit te zetten als annulering is gevraagd
+cron.schedule("0 0 * * *", async () => {
+  const now = new Date();
+
+  try {
+    const users = await User.find({
+      premium: true,
+      premiumEndDate: { $lte: now },
+      premiumCancelPending: true,
+    });
+
+    for (const user of users) {
+      user.premium = false;
+      user.premiumType = null;
+      user.premiumStartDate = null;
+      user.premiumEndDate = null;
+      user.premiumCancelPending = false;
+
+      await user.save();
+      console.log(`Premium uitgeschakeld voor gebruiker ${user._id}`);
+    }
+  } catch (error) {
+    console.error("❌ Fout bij automatische premium uitschakeling:", error);
+  }
+});
+
+// Start de server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server draait op poort ${PORT}`);
+  console.log(`🚀 Server gestart op poort ${PORT}`);
 });
