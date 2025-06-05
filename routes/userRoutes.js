@@ -160,16 +160,26 @@ router.post("/password", authenticateToken, async (req, res) => {
 
 // Premium activeren
 router.post("/premium", authenticateToken, async (req, res) => {
+  const { premiumType } = req.body; // verwacht "month" of "year"
+
+  if (!premiumType || !["month", "year"].includes(premiumType)) {
+    return res.status(400).json({ error: "Ongeldig premium type" });
+  }
+
   try {
     const user = await User.findById(req.userId);
     if (!user)
       return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
     user.premium = true;
+    user.premiumType = premiumType;
     user.premiumCancelPending = false;
     await user.save();
 
-    res.json({ success: true, message: "Premium geactiveerd!" });
+    res.json({
+      success: true,
+      message: `Premium (${premiumType}) geactiveerd!`,
+    });
   } catch (error) {
     console.error("❌ Fout bij activeren premium:", error);
     res.status(500).json({ error: "Interne serverfout" });
