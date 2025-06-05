@@ -34,6 +34,11 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  premiumType: {
+    type: String,
+    enum: ["month", "year"],
+    default: null,
+  },
   premiumCancelPending: {
     type: Boolean,
     default: false,
