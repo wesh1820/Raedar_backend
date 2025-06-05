@@ -2,9 +2,9 @@ const express = require("express");
 const path = require("path");
 const mongoose = require("mongoose");
 const cors = require("cors");
-require("dotenv").config();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
 const User = require("./models/User");
 const Ticket = require("./models/Ticket");
@@ -12,10 +12,11 @@ const ticketRoutes = require("./routes/ticketRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-// Serve static files (images) from the "public/images" directory
+// Serve static images from "public/images"
 app.use("/images", express.static(path.join(__dirname, "public", "images")));
 
 // Connect to MongoDB
@@ -27,7 +28,7 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection failed:", err));
 
-// Helper middleware om token te verifiëren
+// JWT Authentication middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
@@ -44,7 +45,9 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// 🔹 USER ROUTES – REGISTREER / LOGIN via telefoonnummer
+// ───── USER ROUTES ─────
+
+// Register or Login user
 app.post("/api/users", async (req, res) => {
   const { email, password, action, username, phoneNumber } = req.body;
 
@@ -57,23 +60,21 @@ app.post("/api/users", async (req, res) => {
 
   try {
     if (action === "register") {
+      // Check duplicates
       const existingEmail = await User.findOne({ email });
       const existingUsername = await User.findOne({ username });
       const existingPhone = await User.findOne({ phoneNumber });
 
-      if (existingEmail) {
+      if (existingEmail)
         return res.status(400).json({ error: "E-mailadres is al in gebruik" });
-      }
-      if (existingUsername) {
+      if (existingUsername)
         return res
           .status(400)
           .json({ error: "Gebruikersnaam is al in gebruik" });
-      }
-      if (existingPhone) {
+      if (existingPhone)
         return res
           .status(400)
           .json({ error: "Telefoonnummer is al in gebruik" });
-      }
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -96,23 +97,20 @@ app.post("/api/users", async (req, res) => {
         user,
       });
     } else if (action === "login") {
-      if (!phoneNumber) {
+      if (!phoneNumber)
         return res
           .status(400)
           .json({ error: "Telefoonnummer is vereist om in te loggen" });
-      }
 
       const user = await User.findOne({ phoneNumber });
-      if (!user) {
+      if (!user)
         return res
           .status(400)
           .json({ error: "Gebruiker met dit nummer bestaat niet" });
-      }
 
       const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
+      if (!isMatch)
         return res.status(400).json({ error: "Ongeldig wachtwoord" });
-      }
 
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
         expiresIn: "1h",
@@ -128,7 +126,7 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
-// 🔹 GET USER PROFIEL
+// Get user profile (without password)
 app.get("/api/users", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
@@ -142,7 +140,7 @@ app.get("/api/users", authenticateToken, async (req, res) => {
   }
 });
 
-// 🔹 GET USER TICKETS
+// Get user tickets
 app.get("/api/users/tickets", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId).populate("tickets");
@@ -156,7 +154,49 @@ app.get("/api/users/tickets", authenticateToken, async (req, res) => {
   }
 });
 
-// 🔹 PREMIUM ACTIVEREN
+// Upload avatar (base64 string or URL)
+app.post("/api/users/avatar", authenticateToken, async (req, res) => {
+  const { avatar } = req.body;
+  if (!avatar) return res.status(400).json({ error: "Geen avatar meegegeven" });
+
+  try {
+    const user = await User.findById(req.userId);
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+
+    user.avatar = avatar;
+    await user.save();
+
+    res.json({ success: true, avatar });
+  } catch (error) {
+    console.error("❌ Fout bij avatar upload:", error);
+    res.status(500).json({ error: "Interne serverfout" });
+  }
+});
+
+// Change password
+app.post("/api/users/password", authenticateToken, async (req, res) => {
+  const { password } = req.body;
+  if (!password)
+    return res.status(400).json({ error: "Nieuw wachtwoord is vereist" });
+
+  try {
+    const user = await User.findById(req.userId);
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({ success: true, message: "Wachtwoord gewijzigd" });
+  } catch (error) {
+    console.error("❌ Fout bij wachtwoord wijzigen:", error);
+    res.status(500).json({ error: "Interne serverfout" });
+  }
+});
+
+// Activate premium
 app.post("/api/users/premium", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -174,7 +214,7 @@ app.post("/api/users/premium", authenticateToken, async (req, res) => {
   }
 });
 
-// 🔹 PREMIUM STOPZETTEN
+// Cancel premium
 app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -194,11 +234,11 @@ app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
   }
 });
 
-// 🔹 Routes voor events en tickets
+// ───── OTHER ROUTES ─────
 app.use("/api/events", eventRoutes);
 app.use("/api/tickets", ticketRoutes);
 
-// 🔹 Server starten
+// ───── START SERVER ─────
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`🚀 Server draait op poort ${PORT}`);
