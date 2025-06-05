@@ -116,6 +116,48 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
+// Avatar uploaden
+router.post("/avatar", authenticateToken, async (req, res) => {
+  const { avatar } = req.body;
+  if (!avatar) return res.status(400).json({ error: "Geen avatar meegegeven" });
+
+  try {
+    const user = await User.findById(req.userId);
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+
+    user.avatar = avatar;
+    await user.save();
+
+    res.json({ success: true, avatar });
+  } catch (error) {
+    console.error("Fout bij avatar upload:", error);
+    res.status(500).json({ error: "Interne serverfout" });
+  }
+});
+
+// Wachtwoord wijzigen
+router.post("/password", authenticateToken, async (req, res) => {
+  const { password } = req.body;
+  if (!password)
+    return res.status(400).json({ error: "Nieuw wachtwoord is vereist" });
+
+  try {
+    const user = await User.findById(req.userId);
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({ success: true, message: "Wachtwoord gewijzigd" });
+  } catch (error) {
+    console.error("Fout bij wachtwoord wijzigen:", error);
+    res.status(500).json({ error: "Interne serverfout" });
+  }
+});
+
 // Premium activeren
 router.post("/premium", authenticateToken, async (req, res) => {
   try {
