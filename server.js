@@ -113,17 +113,15 @@ app.post("/api/users", async (req, res) => {
       if (!isMatch)
         return res.status(400).json({ error: "Ongeldig wachtwoord" });
 
-      // Check of premium verlopen is en annuleer indien nodig
+      // **Premium abonnement altijd uitzetten als verlopen**
       const now = new Date();
       if (user.premium && user.premiumEndDate && user.premiumEndDate <= now) {
-        if (user.premiumCancelPending) {
-          user.premium = false;
-          user.premiumType = null;
-          user.premiumStartDate = null;
-          user.premiumEndDate = null;
-          user.premiumCancelPending = false;
-          await user.save();
-        }
+        user.premium = false;
+        user.premiumType = null;
+        user.premiumStartDate = null;
+        user.premiumEndDate = null;
+        user.premiumCancelPending = false;
+        await user.save();
       }
 
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
@@ -287,32 +285,32 @@ app.use("/api/events", eventRoutes);
 // ───── CRONJOB VOOR PREMIUM VERVAL ─────
 // Draait elke dag om middernacht om verlopen premium abonnementen uit te zetten als annulering is gevraagd
 cron.schedule("0 0 * * *", async () => {
-  const now = new Date();
-
   try {
-    const users = await User.find({
+    const now = new Date();
+
+    // Alleen annuleringen die voorbij de premiumEndDate zijn worden uitgezet
+    const usersToCancel = await User.find({
       premium: true,
-      premiumEndDate: { $lte: now },
       premiumCancelPending: true,
+      premiumEndDate: { $lte: now },
     });
 
-    for (const user of users) {
+    for (const user of usersToCancel) {
       user.premium = false;
       user.premiumType = null;
       user.premiumStartDate = null;
       user.premiumEndDate = null;
       user.premiumCancelPending = false;
-
       await user.save();
-      console.log(`Premium uitgeschakeld voor gebruiker ${user._id}`);
+      console.log(`Premium abonnement uitgezet voor gebruiker ${user._id}`);
     }
   } catch (error) {
-    console.error("❌ Fout bij automatische premium uitschakeling:", error);
+    console.error("❌ Fout in cronjob premium verval:", error);
   }
 });
 
 // Start de server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server gestart op poort ${PORT}`);
+  console.log(`🚀 Server draait op poort ${PORT}`);
 });
