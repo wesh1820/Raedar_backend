@@ -36,8 +36,8 @@ const ticketSchema = new mongoose.Schema({
   },
   // Nieuw: of het ticket betaald is
   paid: {
-    type: Boolean,
-    default: false,
+    type: Number, // ← gebruik Number, geen String
+    default: null, // ← zodat je weet of het betaald is
   },
 });
 

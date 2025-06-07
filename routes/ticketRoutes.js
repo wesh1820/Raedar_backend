@@ -2,15 +2,14 @@ const express = require("express");
 const Ticket = require("../models/Ticket");
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
+
 const router = express.Router();
 
-// ✅ Middleware om de JWT token te valideren
+// ✅ Middleware: JWT token valideren
 const verifyToken = (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
-
-  if (!token) {
+  if (!token)
     return res.status(401).json({ error: "Access denied, token missing" });
-  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -21,7 +20,7 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// ✅ GET: Haal alle tickets op voor de ingelogde gebruiker
+// ✅ GET: Haal alle tickets op voor ingelogde gebruiker
 router.get("/", verifyToken, async (req, res) => {
   try {
     const tickets = await Ticket.find({ user: req.userId });
@@ -35,7 +34,6 @@ router.get("/", verifyToken, async (req, res) => {
 // ✅ POST: Maak een nieuw ticket aan
 router.post("/", verifyToken, async (req, res) => {
   const { type, price, availability, duration, latitude, longitude } = req.body;
-
   const userId = req.userId;
 
   if (!duration) {
@@ -87,7 +85,7 @@ router.patch("/:id", verifyToken, async (req, res) => {
   }
 });
 
-// ✅ POST: Bevestig betaling
+// ✅ NIEUW: Bevestig betaling en zet bedrag in ticket.paid
 router.post("/payment/confirm", verifyToken, async (req, res) => {
   const { ticketId, amount, vehicleId } = req.body;
 
@@ -101,19 +99,17 @@ router.post("/payment/confirm", verifyToken, async (req, res) => {
       return res.status(404).json({ error: "Ticket niet gevonden" });
     }
 
-    // Markeer als betaald
-    ticket.paid = true;
+    if (ticket.paid) {
+      return res.status(400).json({ error: "Dit ticket is al betaald." });
+    }
+
+    ticket.paid = amount;
     await ticket.save();
 
-    console.log("💰 Betaling bevestigd:", {
-      ticketId,
-      bedrag: amount,
-      voertuig: vehicleId,
-    });
-
-    res.status(200).json({ message: "Betaling succesvol verwerkt." });
+    console.log(`✅ Betaling bevestigd voor ticket ${ticketId}: €${amount}`);
+    res.status(200).json({ message: "Betaling bevestigd", ticket });
   } catch (err) {
-    console.error("❌ Fout bij betaling:", err);
+    console.error("❌ Fout bij verwerken betaling:", err);
     res.status(500).json({ error: "Serverfout bij betaling" });
   }
 });
