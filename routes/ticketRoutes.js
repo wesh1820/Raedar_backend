@@ -1,6 +1,6 @@
 const express = require("express");
 const Ticket = require("../models/Ticket");
-const User = require("../models/User"); // Import User model
+const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const router = express.Router();
 
@@ -14,7 +14,7 @@ const verifyToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId; // Zet userId in req object
+    req.userId = decoded.userId;
     next();
   } catch (err) {
     res.status(400).json({ error: "Invalid token" });
@@ -32,38 +32,29 @@ router.get("/", verifyToken, async (req, res) => {
   }
 });
 
-// ✅ POST: Maak een nieuw ticket aan voor de gebruiker
+// ✅ POST: Maak een nieuw ticket aan
 router.post("/", verifyToken, async (req, res) => {
-  const {
-    type,
-    price,
-    availability,
-    duration,
-    latitude,
-    longitude, // ✅ voeg toe
-  } = req.body;
+  const { type, price, availability, duration, latitude, longitude } = req.body;
+
   const userId = req.userId;
 
   if (!duration) {
-    // Voeg een check toe voor de duur
     return res.status(400).json({ error: "Duration is required" });
   }
 
   try {
-    // Maak een nieuw ticket aan
     const newTicket = new Ticket({
       type,
       price,
       availability,
       duration,
-      latitude, // ✅ nieuw veld
-      longitude, // ✅ nieuw veld
+      latitude,
+      longitude,
       user: userId,
     });
 
     const savedTicket = await newTicket.save();
 
-    // Voeg het ticket toe aan de gebruiker
     await User.findByIdAndUpdate(userId, {
       $push: { tickets: savedTicket._id },
     });
@@ -72,6 +63,27 @@ router.post("/", verifyToken, async (req, res) => {
   } catch (err) {
     console.error("❌ Error creating ticket:", err);
     res.status(500).json({ error: "Error creating ticket" });
+  }
+});
+
+// ✅ PATCH: Update ticketprijs
+router.patch("/:id", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const { price } = req.body;
+
+  try {
+    const ticket = await Ticket.findOne({ _id: id, user: req.userId });
+    if (!ticket) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    ticket.price = price;
+    const updatedTicket = await ticket.save();
+
+    res.status(200).json({ ticket: updatedTicket });
+  } catch (err) {
+    console.error("❌ Error updating ticket:", err);
+    res.status(500).json({ error: "Fout bij bijwerken van ticket" });
   }
 });
 
