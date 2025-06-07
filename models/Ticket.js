@@ -14,20 +14,9 @@ const ticketSchema = new mongoose.Schema({
     required: true,
   },
   duration: {
+    // Voeg het duration veld toe
     type: Number,
-    required: true,
-  },
-  parkingName: {
-    type: String,
-  },
-  location: {
-    type: String,
-  },
-  latitude: {
-    type: Number,
-  },
-  longitude: {
-    type: Number,
+    required: true, // Maak het een verplicht veld
   },
   createdAt: {
     type: Date,
