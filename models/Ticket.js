@@ -14,9 +14,8 @@ const ticketSchema = new mongoose.Schema({
     required: true,
   },
   duration: {
-    // Voeg het duration veld toe
     type: Number,
-    required: true, // Maak het een verplicht veld
+    required: true, // in minuten
   },
   createdAt: {
     type: Date,
@@ -26,6 +25,16 @@ const ticketSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
+  },
+
+  // ✅ Nieuw toegevoegd:
+  latitude: {
+    type: Number,
+    required: false, // optioneel, maar aanbevolen
+  },
+  longitude: {
+    type: Number,
+    required: false,
   },
 });
 
