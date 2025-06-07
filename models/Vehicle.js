@@ -4,21 +4,21 @@ const vehicleSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true,
+    required: false, // optioneel, want frontend stuurt dit nu niet mee
   },
-  make: {
+  brand: {
     type: String,
-    required: true, // Bijvoorbeeld: "Toyota"
+    required: true, // ipv make
   },
   model: {
     type: String,
-    required: true, // Bijvoorbeeld: "Corolla"
+    required: true,
   },
   year: {
     type: Number,
     required: true,
   },
-  licensePlate: {
+  plate: {
     type: String,
     required: true,
     unique: true,
