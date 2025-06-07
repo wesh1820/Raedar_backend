@@ -9,6 +9,7 @@ require("dotenv").config();
 
 const User = require("./models/User");
 const Ticket = require("./models/Ticket");
+const vehicleRoutes = require("./routes/vehicleRoutes");
 const ticketRoutes = require("./routes/ticketRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 
@@ -278,9 +279,10 @@ app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
   }
 });
 
-// ───── TICKET & EVENT ROUTES ─────
+// ───── TICKET, EVENT & VEHICLE ROUTES ─────
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/events", eventRoutes);
+app.use("/api/vehicles", vehicleRoutes);
 
 // ───── CRONJOB VOOR PREMIUM VERVAL ─────
 // Draait elke dag om middernacht om verlopen premium abonnementen uit te zetten als annulering is gevraagd

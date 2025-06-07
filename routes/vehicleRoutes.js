@@ -1,50 +1,29 @@
 const express = require("express");
 const router = express.Router();
-const Vehicle = require("../models/Vehicle");
-const jwt = require("jsonwebtoken");
+const Vehicle = require("../models/vehicle");
 
-// Middleware voor authenticatie via JWT (zelfde als userroutes)
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
-
-  const token = authHeader.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
-    next();
-  } catch (err) {
-    return res.status(403).json({ error: "Invalid token" });
-  }
+// Voorbeeld middleware om `req.userId` te verkrijgen. In praktijk gebruik je auth middleware (zoals JWT)
+const mockAuthMiddleware = (req, res, next) => {
+  req.userId = "665b5cfb8e1ec0f34a6e02ef"; // Gebruik je echte user ID hier
+  next();
 };
 
-// Alle voertuigen ophalen van ingelogde gebruiker
-router.get("/", authenticateToken, async (req, res) => {
+router.use(mockAuthMiddleware);
+
+// 🚗 GET alle voertuigen van de gebruiker
+router.get("/", async (req, res) => {
   try {
     const vehicles = await Vehicle.find({ userId: req.userId });
-    res.json(vehicles);
+    res.status(200).json(vehicles);
   } catch (error) {
-    console.error("Fout bij ophalen voertuigen:", error);
-    res.status(500).json({ error: "Interne serverfout" });
+    res.status(500).json({ message: "Server error", error });
   }
 });
 
-// Voertuig toevoegen
-router.post("/", authenticateToken, async (req, res) => {
-  const { make, model, year, licensePlate, color } = req.body;
-
-  if (!make || !model || !year || !licensePlate) {
-    return res.status(400).json({ error: "Vereiste velden missen" });
-  }
-
+// 🚗 POST nieuw voertuig toevoegen
+router.post("/", async (req, res) => {
   try {
-    // Check op uniek kenteken
-    const existingVehicle = await Vehicle.findOne({ licensePlate });
-    if (existingVehicle) {
-      return res.status(400).json({ error: "Kenteken al in gebruik" });
-    }
+    const { make, model, year, licensePlate, color } = req.body;
 
     const vehicle = new Vehicle({
       userId: req.userId,
@@ -55,53 +34,31 @@ router.post("/", authenticateToken, async (req, res) => {
       color,
     });
 
-    await vehicle.save();
-    res.json({ message: "Voertuig toegevoegd", vehicle });
+    const saved = await vehicle.save();
+    res.status(201).json(saved);
   } catch (error) {
-    console.error("Fout bij toevoegen voertuig:", error);
-    res.status(500).json({ error: "Interne serverfout" });
-  }
-});
-
-// Voertuig updaten
-router.put("/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const updateData = req.body;
-
-  try {
-    const vehicle = await Vehicle.findOne({ _id: id, userId: req.userId });
-    if (!vehicle) {
-      return res.status(404).json({ error: "Voertuig niet gevonden" });
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Kenteken is al in gebruik." });
     }
-
-    // Voertuig bijwerken
-    Object.assign(vehicle, updateData);
-    await vehicle.save();
-
-    res.json({ message: "Voertuig bijgewerkt", vehicle });
-  } catch (error) {
-    console.error("Fout bij updaten voertuig:", error);
-    res.status(500).json({ error: "Interne serverfout" });
+    res.status(500).json({ message: "Server error", error });
   }
 });
 
-// Voertuig verwijderen
-router.delete("/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-
+// 🚗 DELETE voertuig
+router.delete("/:id", async (req, res) => {
   try {
     const vehicle = await Vehicle.findOneAndDelete({
-      _id: id,
+      _id: req.params.id,
       userId: req.userId,
     });
+
     if (!vehicle) {
-      return res.status(404).json({ error: "Voertuig niet gevonden" });
+      return res.status(404).json({ message: "Voertuig niet gevonden" });
     }
 
-    res.json({ message: "Voertuig verwijderd" });
+    res.status(200).json({ message: "Voertuig verwijderd" });
   } catch (error) {
-    console.error("Fout bij verwijderen voertuig:", error);
-    res.status(500).json({ error: "Interne serverfout" });
+    res.status(500).json({ message: "Server error", error });
   }
 });
 
