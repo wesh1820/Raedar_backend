@@ -1,10 +1,11 @@
 const express = require("express");
 const Ticket = require("../models/Ticket");
-const User = require("../models/User"); // Import User model
+const User = require("../models/User");
 const jwt = require("jsonwebtoken");
+
 const router = express.Router();
 
-// ✅ Middleware om de JWT token te valideren
+// ✅ Middleware: JWT check
 const verifyToken = (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
 
@@ -14,14 +15,14 @@ const verifyToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId; // Zet userId in req object
+    req.userId = decoded.userId;
     next();
   } catch (err) {
     res.status(400).json({ error: "Invalid token" });
   }
 };
 
-// ✅ GET: Haal alle tickets op voor de ingelogde gebruiker
+// ✅ GET: Alle tickets van de ingelogde gebruiker
 router.get("/", verifyToken, async (req, res) => {
   try {
     const tickets = await Ticket.find({ user: req.userId });
@@ -32,29 +33,41 @@ router.get("/", verifyToken, async (req, res) => {
   }
 });
 
-// ✅ POST: Maak een nieuw ticket aan voor de gebruiker
+// ✅ POST: Nieuw ticket aanmaken
 router.post("/", verifyToken, async (req, res) => {
-  const { type, price, availability, duration } = req.body; // Zorg ervoor dat je 'duration' hier ontvangt
+  const {
+    type,
+    price,
+    availability,
+    duration,
+    parkingName,
+    location,
+    latitude,
+    longitude,
+  } = req.body;
+
   const userId = req.userId;
 
   if (!duration) {
-    // Voeg een check toe voor de duur
     return res.status(400).json({ error: "Duration is required" });
   }
 
   try {
-    // Maak een nieuw ticket aan
     const newTicket = new Ticket({
       type,
       price,
       availability,
-      duration, // Voeg de duur toe aan het ticket
+      duration,
+      parkingName,
+      location,
+      latitude,
+      longitude,
       user: userId,
     });
 
     const savedTicket = await newTicket.save();
 
-    // Voeg het ticket toe aan de gebruiker
+    // Voeg toe aan user
     await User.findByIdAndUpdate(userId, {
       $push: { tickets: savedTicket._id },
     });
