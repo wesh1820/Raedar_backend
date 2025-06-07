@@ -87,4 +87,35 @@ router.patch("/:id", verifyToken, async (req, res) => {
   }
 });
 
+// ✅ POST: Bevestig betaling
+router.post("/payment/confirm", verifyToken, async (req, res) => {
+  const { ticketId, amount, vehicleId } = req.body;
+
+  if (!ticketId || !amount) {
+    return res.status(400).json({ error: "ticketId en amount zijn verplicht" });
+  }
+
+  try {
+    const ticket = await Ticket.findOne({ _id: ticketId, user: req.userId });
+    if (!ticket) {
+      return res.status(404).json({ error: "Ticket niet gevonden" });
+    }
+
+    // Markeer als betaald
+    ticket.paid = true;
+    await ticket.save();
+
+    console.log("💰 Betaling bevestigd:", {
+      ticketId,
+      bedrag: amount,
+      voertuig: vehicleId,
+    });
+
+    res.status(200).json({ message: "Betaling succesvol verwerkt." });
+  } catch (err) {
+    console.error("❌ Fout bij betaling:", err);
+    res.status(500).json({ error: "Serverfout bij betaling" });
+  }
+});
+
 module.exports = router;
