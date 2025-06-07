@@ -1,64 +1,44 @@
 const express = require("express");
 const router = express.Router();
-const Vehicle = require("../models/vehicle");
+const Vehicle = require("../models/Vehicle");
 
-// Voorbeeld middleware om `req.userId` te verkrijgen. In praktijk gebruik je auth middleware (zoals JWT)
-const mockAuthMiddleware = (req, res, next) => {
-  req.userId = "665b5cfb8e1ec0f34a6e02ef"; // Gebruik je echte user ID hier
-  next();
-};
-
-router.use(mockAuthMiddleware);
-
-// 🚗 GET alle voertuigen van de gebruiker
+// GET all vehicles
 router.get("/", async (req, res) => {
   try {
-    const vehicles = await Vehicle.find({ userId: req.userId });
-    res.status(200).json(vehicles);
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    const vehicles = await Vehicle.find();
+    res.json(vehicles);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 
-// 🚗 POST nieuw voertuig toevoegen
+// POST new vehicle
 router.post("/", async (req, res) => {
+  const { brand, model, year, plate, color, userId } = req.body;
+
+  if (!brand || !model || !year || !plate) {
+    return res.status(400).json({ message: "Alle velden zijn verplicht" });
+  }
+
   try {
-    const { make, model, year, licensePlate, color } = req.body;
+    const existing = await Vehicle.findOne({ plate });
+    if (existing) {
+      return res.status(400).json({ message: "Kenteken bestaat al" });
+    }
 
     const vehicle = new Vehicle({
-      userId: req.userId,
-      make,
+      brand,
       model,
       year,
-      licensePlate,
-      color,
+      plate,
+      color: color || "",
+      userId: userId || null,
     });
 
-    const saved = await vehicle.save();
-    res.status(201).json(saved);
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({ message: "Kenteken is al in gebruik." });
-    }
-    res.status(500).json({ message: "Server error", error });
-  }
-});
-
-// 🚗 DELETE voertuig
-router.delete("/:id", async (req, res) => {
-  try {
-    const vehicle = await Vehicle.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.userId,
-    });
-
-    if (!vehicle) {
-      return res.status(404).json({ message: "Voertuig niet gevonden" });
-    }
-
-    res.status(200).json({ message: "Voertuig verwijderd" });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    const savedVehicle = await vehicle.save();
+    res.status(201).json(savedVehicle);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 
