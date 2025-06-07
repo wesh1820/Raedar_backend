@@ -9,6 +9,7 @@ require("dotenv").config();
 
 const User = require("./models/User");
 const Ticket = require("./models/Ticket");
+const Ticket = require("./models/Vehicle");
 const vehicleRoutes = require("./routes/vehicleRoutes");
 const ticketRoutes = require("./routes/ticketRoutes");
 const eventRoutes = require("./routes/eventRoutes");
