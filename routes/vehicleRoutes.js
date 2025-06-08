@@ -59,6 +59,31 @@ router.post("/", authenticateToken, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+// UPDATE voertuig
+router.put("/:id", authenticateToken, async (req, res) => {
+  try {
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) {
+      return res.status(404).json({ message: "Voertuig niet gevonden" });
+    }
+    if (vehicle.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Geen toegang tot dit voertuig" });
+    }
+
+    const { brand, model, year, plate, color } = req.body;
+
+    if (brand !== undefined) vehicle.brand = brand;
+    if (model !== undefined) vehicle.model = model;
+    if (year !== undefined) vehicle.year = year;
+    if (plate !== undefined) vehicle.plate = plate;
+    if (color !== undefined) vehicle.color = color;
+
+    await vehicle.save();
+    res.json(vehicle);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // DELETE voertuig alleen als eigenaar
 router.delete("/:id", authenticateToken, async (req, res) => {
