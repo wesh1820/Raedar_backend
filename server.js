@@ -19,8 +19,6 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Serve static images
 app.use("/images", express.static(path.join(__dirname, "public", "images")));
 
 // Connect to MongoDB
@@ -51,7 +49,7 @@ const authenticateToken = (req, res, next) => {
 
 // ───── USER ROUTES ─────
 
-// Register or Login user
+// Register or login
 app.post("/api/users", async (req, res) => {
   const { email, password, action, username, phoneNumber } = req.body;
 
@@ -64,7 +62,6 @@ app.post("/api/users", async (req, res) => {
 
   try {
     if (action === "register") {
-      // Check duplicates
       const existingEmail = await User.findOne({ email });
       const existingUsername = await User.findOne({ username });
       const existingPhone = await User.findOne({ phoneNumber });
@@ -116,7 +113,6 @@ app.post("/api/users", async (req, res) => {
       if (!isMatch)
         return res.status(400).json({ error: "Ongeldig wachtwoord" });
 
-      // Premium automatisch uitzetten als verlopen
       const now = new Date();
       if (user.premium && user.premiumEndDate && user.premiumEndDate <= now) {
         user.premium = false;
@@ -141,7 +137,7 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
-// Get user profile (zonder password)
+// Profiel ophalen
 app.get("/api/users", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
@@ -155,9 +151,10 @@ app.get("/api/users", authenticateToken, async (req, res) => {
   }
 });
 
-// Update profiel
+// ✅ Profiel updaten + kaart opslaan
 app.post("/api/users/update", authenticateToken, async (req, res) => {
-  const { firstName, lastName, street, city, email, phoneNumber } = req.body;
+  const { firstName, lastName, street, city, email, phoneNumber, card } =
+    req.body;
 
   try {
     const user = await User.findById(req.userId);
@@ -171,16 +168,24 @@ app.post("/api/users/update", authenticateToken, async (req, res) => {
     if (email !== undefined) user.email = email;
     if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
 
-    await user.save();
+    if (card) {
+      const { number, expiry, cvv, holder } = card;
+      if (!user.card) user.card = {};
+      if (number !== undefined) user.card.number = number;
+      if (expiry !== undefined) user.card.expiry = expiry;
+      if (cvv !== undefined) user.card.cvv = cvv;
+      if (holder !== undefined) user.card.holder = holder;
+    }
 
-    res.json({ success: true, message: "Profiel bijgewerkt" });
+    await user.save();
+    res.json({ success: true, message: "Profiel en kaartgegevens bijgewerkt" });
   } catch (error) {
     console.error("❌ Fout bij updaten profiel:", error);
     res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
-// Upload avatar
+// Avatar uploaden
 app.post("/api/users/avatar", authenticateToken, async (req, res) => {
   const { avatar } = req.body;
   if (!avatar) return res.status(400).json({ error: "Geen avatar meegegeven" });
@@ -200,7 +205,7 @@ app.post("/api/users/avatar", authenticateToken, async (req, res) => {
   }
 });
 
-// Change password
+// Wachtwoord wijzigen
 app.post("/api/users/password", authenticateToken, async (req, res) => {
   const { password } = req.body;
   if (!password)
@@ -224,7 +229,7 @@ app.post("/api/users/password", authenticateToken, async (req, res) => {
 
 // Premium activeren
 app.post("/api/users/premium", authenticateToken, async (req, res) => {
-  const { premiumType } = req.body; // "month" of "year"
+  const { premiumType } = req.body;
 
   if (!premiumType || !["month", "year"].includes(premiumType)) {
     return res.status(400).json({ error: "Ongeldig premium type" });
@@ -236,19 +241,14 @@ app.post("/api/users/premium", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
     const now = new Date();
-    let premiumEndDate;
-
-    if (premiumType === "month") {
-      premiumEndDate = new Date(now);
-      premiumEndDate.setMonth(premiumEndDate.getMonth() + 1);
-    } else if (premiumType === "year") {
-      premiumEndDate = new Date(now);
-      premiumEndDate.setFullYear(premiumEndDate.getFullYear() + 1);
-    }
+    let premiumEndDate =
+      premiumType === "month"
+        ? new Date(now.setMonth(now.getMonth() + 1))
+        : new Date(now.setFullYear(now.getFullYear() + 1));
 
     user.premium = true;
     user.premiumType = premiumType;
-    user.premiumStartDate = now;
+    user.premiumStartDate = new Date();
     user.premiumEndDate = premiumEndDate;
     user.premiumCancelPending = false;
 
@@ -256,8 +256,7 @@ app.post("/api/users/premium", authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message: `Premium (${premiumType}) geactiveerd tot ${premiumEndDate.toISOString()}`,
-      premiumEndDate,
+      message: `Premium geactiveerd tot ${premiumEndDate.toISOString()}`,
     });
   } catch (error) {
     console.error("❌ Fout bij premium activeren:", error);
@@ -273,9 +272,7 @@ app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
     if (!user.premium) {
-      return res
-        .status(400)
-        .json({ error: "Gebruiker heeft geen actief premium abonnement" });
+      return res.status(400).json({ error: "Geen actief premium abonnement" });
     }
 
     user.premiumCancelPending = true;
@@ -283,8 +280,7 @@ app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message:
-        "Premium annulering is gemarkeerd. Premium blijft actief tot het einde van de periode.",
+      message: "Premium wordt op het einde van de periode stopgezet.",
     });
   } catch (error) {
     console.error("❌ Fout bij premium annuleren:", error);
@@ -292,17 +288,15 @@ app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
   }
 });
 
-// ───── TICKET, EVENT & VEHICLE ROUTES ─────
+// ───── Andere routes ─────
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 
-// ───── CRONJOB VOOR PREMIUM VERVAL ─────
+// ───── CRONJOB ─────
 cron.schedule("0 0 * * *", async () => {
   try {
     const now = new Date();
-
-    // Alleen annuleringen die voorbij de premiumEndDate zijn worden uitgezet
     const usersToCancel = await User.find({
       premium: true,
       premiumCancelPending: true,
@@ -316,14 +310,14 @@ cron.schedule("0 0 * * *", async () => {
       user.premiumEndDate = null;
       user.premiumCancelPending = false;
       await user.save();
-      console.log(`Premium abonnement uitgezet voor gebruiker ${user._id}`);
+      console.log(`⏹ Premium gedeactiveerd voor ${user._id}`);
     }
   } catch (error) {
-    console.error("❌ Fout in cronjob premium verval:", error);
+    console.error("❌ Cronjob fout:", error);
   }
 });
 
-// Start server
+// Server starten
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server draait op poort ${PORT}`);
