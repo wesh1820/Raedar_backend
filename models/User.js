@@ -8,7 +8,7 @@ const vehicleSchema = new mongoose.Schema({
   plate: { type: String, required: true },
 });
 
-// Hoofd User schema
+// Hoofd User schema met extra velden toegevoegd
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   username: { type: String, required: true, unique: true },
@@ -17,13 +17,18 @@ const userSchema = new mongoose.Schema({
   avatar: { type: String, default: null },
   tickets: [{ type: mongoose.Schema.Types.ObjectId, ref: "Ticket" }],
 
+  // Nieuwe velden
+  firstName: { type: String, default: "" },
+  lastName: { type: String, default: "" },
+  street: { type: String, default: "" },
+  city: { type: String, default: "" },
+
   premium: { type: Boolean, default: false },
   premiumType: { type: String, enum: ["month", "year"], default: null },
   premiumStartDate: { type: Date, default: null },
   premiumEndDate: { type: Date, default: null },
   premiumCancelPending: { type: Boolean, default: false },
 
-  // Array van voertuigen
   vehicles: [vehicleSchema],
 });
 
