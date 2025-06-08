@@ -16,10 +16,11 @@ const eventRoutes = require("./routes/eventRoutes");
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Serve static images from "public/images"
+// Serve static images
 app.use("/images", express.static(path.join(__dirname, "public", "images")));
 
 // Connect to MongoDB
@@ -154,21 +155,32 @@ app.get("/api/users", authenticateToken, async (req, res) => {
   }
 });
 
-// Get user tickets
-app.get("/api/users/tickets", authenticateToken, async (req, res) => {
+// Update profiel
+app.post("/api/users/update", authenticateToken, async (req, res) => {
+  const { firstName, lastName, street, city, email, phoneNumber } = req.body;
+
   try {
-    const user = await User.findById(req.userId).populate("tickets");
+    const user = await User.findById(req.userId);
     if (!user)
       return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
-    res.json(user.tickets);
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
+    if (street !== undefined) user.street = street;
+    if (city !== undefined) user.city = city;
+    if (email !== undefined) user.email = email;
+    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+
+    await user.save();
+
+    res.json({ success: true, message: "Profiel bijgewerkt" });
   } catch (error) {
-    console.error("❌ Fout bij ophalen tickets:", error);
+    console.error("❌ Fout bij updaten profiel:", error);
     res.status(500).json({ error: "Interne serverfout" });
   }
 });
 
-// Upload avatar (base64 string or URL)
+// Upload avatar
 app.post("/api/users/avatar", authenticateToken, async (req, res) => {
   const { avatar } = req.body;
   if (!avatar) return res.status(400).json({ error: "Geen avatar meegegeven" });
@@ -209,31 +221,8 @@ app.post("/api/users/password", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Interne serverfout" });
   }
 });
-app.post("/api/users/update", authenticateToken, async (req, res) => {
-  const { firstName, lastName, street, city, email, phoneNumber } = req.body;
 
-  try {
-    const user = await User.findById(req.userId);
-    if (!user)
-      return res.status(404).json({ error: "Gebruiker niet gevonden" });
-
-    if (firstName !== undefined) user.firstName = firstName;
-    if (lastName !== undefined) user.lastName = lastName;
-    if (street !== undefined) user.street = street;
-    if (city !== undefined) user.city = city;
-    if (email !== undefined) user.email = email;
-    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
-
-    await user.save();
-
-    res.json({ success: true, message: "Profiel bijgewerkt" });
-  } catch (error) {
-    console.error("❌ Fout bij updaten profiel:", error);
-    res.status(500).json({ error: "Interne serverfout" });
-  }
-});
-
-// Activate premium
+// Premium activeren
 app.post("/api/users/premium", authenticateToken, async (req, res) => {
   const { premiumType } = req.body; // "month" of "year"
 
@@ -276,7 +265,7 @@ app.post("/api/users/premium", authenticateToken, async (req, res) => {
   }
 });
 
-// Cancel premium
+// Premium annuleren
 app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -309,7 +298,6 @@ app.use("/api/events", eventRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 
 // ───── CRONJOB VOOR PREMIUM VERVAL ─────
-// Draait elke dag om middernacht om verlopen premium abonnementen uit te zetten als annulering is gevraagd
 cron.schedule("0 0 * * *", async () => {
   try {
     const now = new Date();
@@ -335,7 +323,7 @@ cron.schedule("0 0 * * *", async () => {
   }
 });
 
-// Start de server
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server draait op poort ${PORT}`);

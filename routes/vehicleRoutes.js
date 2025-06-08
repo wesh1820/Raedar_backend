@@ -1,33 +1,38 @@
 const express = require("express");
 const router = express.Router();
 const Vehicle = require("../models/Vehicle");
+const jwt = require("jsonwebtoken");
 
-// GET all vehicles
-router.get("/", async (req, res) => {
+// Middleware authenticatie
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) return res.status(401).json({ message: "Unauthorized" });
+
+  const token = authHeader.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
+
   try {
-    const vehicles = await Vehicle.find();
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.userId;
+    next();
+  } catch (err) {
+    return res.status(403).json({ message: "Invalid token" });
+  }
+};
+
+// GET alle voertuigen van ingelogde gebruiker
+router.get("/", authenticateToken, async (req, res) => {
+  try {
+    const vehicles = await Vehicle.find({ userId: req.userId });
     res.json(vehicles);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.delete("/:id", async (req, res) => {
-  try {
-    const vehicle = await Vehicle.findById(req.params.id);
-    if (!vehicle) {
-      return res.status(404).json({ message: "Voertuig niet gevonden" });
-    }
-    await vehicle.remove();
-    res.json({ message: "Voertuig verwijderd" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// POST new vehicle
-router.post("/", async (req, res) => {
-  const { brand, model, year, plate, color, userId } = req.body;
+// POST nieuw voertuig (voeg userId uit token toe)
+router.post("/", authenticateToken, async (req, res) => {
+  const { brand, model, year, plate, color } = req.body;
 
   if (!brand || !model || !year || !plate) {
     return res.status(400).json({ message: "Alle velden zijn verplicht" });
@@ -45,11 +50,29 @@ router.post("/", async (req, res) => {
       year,
       plate,
       color: color || "",
-      userId: userId || null,
+      userId: req.userId,
     });
 
     const savedVehicle = await vehicle.save();
     res.status(201).json(savedVehicle);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE voertuig alleen als eigenaar
+router.delete("/:id", authenticateToken, async (req, res) => {
+  try {
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) {
+      return res.status(404).json({ message: "Voertuig niet gevonden" });
+    }
+    if (vehicle.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Geen toegang tot dit voertuig" });
+    }
+
+    await vehicle.remove();
+    res.json({ message: "Voertuig verwijderd" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
