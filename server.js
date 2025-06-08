@@ -209,6 +209,29 @@ app.post("/api/users/password", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Interne serverfout" });
   }
 });
+app.post("/api/users/update", authenticateToken, async (req, res) => {
+  const { firstName, lastName, street, city, email, phoneNumber } = req.body;
+
+  try {
+    const user = await User.findById(req.userId);
+    if (!user)
+      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
+    if (street !== undefined) user.street = street;
+    if (city !== undefined) user.city = city;
+    if (email !== undefined) user.email = email;
+    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+
+    await user.save();
+
+    res.json({ success: true, message: "Profiel bijgewerkt" });
+  } catch (error) {
+    console.error("❌ Fout bij updaten profiel:", error);
+    res.status(500).json({ error: "Interne serverfout" });
+  }
+});
 
 // Activate premium
 app.post("/api/users/premium", authenticateToken, async (req, res) => {
