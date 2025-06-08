@@ -131,6 +131,7 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 // Profiel updaten
+// Profiel updaten
 router.post("/update", authenticateToken, async (req, res) => {
   const { firstName, lastName, street, city, email, phoneNumber } = req.body;
 
@@ -147,31 +148,22 @@ router.post("/update", authenticateToken, async (req, res) => {
     if (email !== undefined) user.email = email;
     if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
 
-    await user.save();
+    // ➕ Voeg deze blok toe:
+    if (req.body.card) {
+      const { number, expiry, cvv, holder } = req.body.card;
 
+      if (!user.card) user.card = {};
+
+      if (number !== undefined) user.card.number = number;
+      if (expiry !== undefined) user.card.expiry = expiry;
+      if (cvv !== undefined) user.card.cvv = cvv;
+      if (holder !== undefined) user.card.holder = holder;
+    }
+
+    await user.save();
     res.json({ success: true, message: "Profiel bijgewerkt" });
   } catch (error) {
     console.error("❌ Fout bij updaten profiel:", error);
-    res.status(500).json({ error: "Interne serverfout" });
-  }
-});
-
-// Avatar uploaden
-router.post("/avatar", authenticateToken, async (req, res) => {
-  const { avatar } = req.body;
-  if (!avatar) return res.status(400).json({ error: "Geen avatar meegegeven" });
-
-  try {
-    const user = await User.findById(req.userId);
-    if (!user)
-      return res.status(404).json({ error: "Gebruiker niet gevonden" });
-
-    user.avatar = avatar;
-    await user.save();
-
-    res.json({ success: true, avatar });
-  } catch (error) {
-    console.error("Fout bij avatar upload:", error);
     res.status(500).json({ error: "Interne serverfout" });
   }
 });
