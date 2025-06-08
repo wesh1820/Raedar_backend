@@ -12,6 +12,19 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  try {
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) {
+      return res.status(404).json({ message: "Voertuig niet gevonden" });
+    }
+    await vehicle.remove();
+    res.json({ message: "Voertuig verwijderd" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // POST new vehicle
 router.post("/", async (req, res) => {
   const { brand, model, year, plate, color, userId } = req.body;
