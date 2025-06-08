@@ -57,7 +57,7 @@ app.post("/api/users", async (req, res) => {
     !password ||
     (action === "register" && (!email || !username || !phoneNumber))
   ) {
-    return res.status(400).json({ error: "Verplichte velden ontbreken" });
+    return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
@@ -67,15 +67,13 @@ app.post("/api/users", async (req, res) => {
       const existingPhone = await User.findOne({ phoneNumber });
 
       if (existingEmail)
-        return res.status(400).json({ error: "E-mailadres is al in gebruik" });
+        return res.status(400).json({ error: "Email is already in use" });
       if (existingUsername)
-        return res
-          .status(400)
-          .json({ error: "Gebruikersnaam is al in gebruik" });
+        return res.status(400).json({ error: "Username is already in use" });
       if (existingPhone)
         return res
           .status(400)
-          .json({ error: "Telefoonnummer is al in gebruik" });
+          .json({ error: "Phone number is already in use" });
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -93,7 +91,7 @@ app.post("/api/users", async (req, res) => {
       });
 
       return res.json({
-        message: "Gebruiker succesvol aangemaakt",
+        message: "User successfully created",
         token,
         user,
       });
@@ -101,17 +99,16 @@ app.post("/api/users", async (req, res) => {
       if (!phoneNumber)
         return res
           .status(400)
-          .json({ error: "Telefoonnummer is vereist om in te loggen" });
+          .json({ error: "Phone number is required to log in" });
 
       const user = await User.findOne({ phoneNumber });
       if (!user)
         return res
           .status(400)
-          .json({ error: "Gebruiker met dit nummer bestaat niet" });
+          .json({ error: "User with this number does not exist" });
 
       const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch)
-        return res.status(400).json({ error: "Ongeldig wachtwoord" });
+      if (!isMatch) return res.status(400).json({ error: "Invalid password" });
 
       const now = new Date();
       if (user.premium && user.premiumEndDate && user.premiumEndDate <= now) {
@@ -127,39 +124,37 @@ app.post("/api/users", async (req, res) => {
         expiresIn: "1h",
       });
 
-      return res.json({ message: "Login gelukt", token, user });
+      return res.json({ message: "Login successful", token, user });
     } else {
-      return res.status(400).json({ error: "Ongeldige actie" });
+      return res.status(400).json({ error: "Invalid action" });
     }
   } catch (error) {
-    console.error("❌ Fout:", error);
-    return res.status(500).json({ error: "Interne serverfout" });
+    console.error("❌ Error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Profiel ophalen
+// Get profile
 app.get("/api/users", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
-    if (!user)
-      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     res.json(user);
   } catch (error) {
-    console.error("❌ Fout bij ophalen gebruiker:", error);
-    res.status(500).json({ error: "Interne serverfout" });
+    console.error("❌ Error fetching user:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ✅ Profiel updaten + kaart opslaan
+// ✅ Update profile + save card
 app.post("/api/users/update", authenticateToken, async (req, res) => {
   const { firstName, lastName, street, city, email, phoneNumber, card } =
     req.body;
 
   try {
     const user = await User.findById(req.userId);
-    if (!user)
-      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     if (firstName !== undefined) user.firstName = firstName;
     if (lastName !== undefined) user.lastName = lastName;
@@ -178,67 +173,64 @@ app.post("/api/users/update", authenticateToken, async (req, res) => {
     }
 
     await user.save();
-    res.json({ success: true, message: "Profiel en kaartgegevens bijgewerkt" });
+    res.json({ success: true, message: "Profile and card details updated" });
   } catch (error) {
-    console.error("❌ Fout bij updaten profiel:", error);
-    res.status(500).json({ error: "Interne serverfout" });
+    console.error("❌ Error updating profile:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Avatar uploaden
+// Upload avatar
 app.post("/api/users/avatar", authenticateToken, async (req, res) => {
   const { avatar } = req.body;
-  if (!avatar) return res.status(400).json({ error: "Geen avatar meegegeven" });
+  if (!avatar) return res.status(400).json({ error: "No avatar provided" });
 
   try {
     const user = await User.findById(req.userId);
-    if (!user)
-      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     user.avatar = avatar;
     await user.save();
 
     res.json({ success: true, avatar });
   } catch (error) {
-    console.error("❌ Fout bij avatar upload:", error);
-    res.status(500).json({ error: "Interne serverfout" });
+    console.error("❌ Error uploading avatar:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Wachtwoord wijzigen
+// Change password
 app.post("/api/users/password", authenticateToken, async (req, res) => {
   const { password } = req.body;
   if (!password)
-    return res.status(400).json({ error: "Nieuw wachtwoord is vereist" });
+    return res.status(400).json({ error: "New password is required" });
 
   try {
     const user = await User.findById(req.userId);
-    if (!user)
-      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
     user.password = hashedPassword;
     await user.save();
 
-    res.json({ success: true, message: "Wachtwoord gewijzigd" });
+    res.json({ success: true, message: "Password changed" });
   } catch (error) {
-    console.error("❌ Fout bij wachtwoord wijzigen:", error);
-    res.status(500).json({ error: "Interne serverfout" });
+    console.error("❌ Error changing password:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Premium activeren
+// Activate premium
 app.post("/api/users/premium", authenticateToken, async (req, res) => {
   const { premiumType } = req.body;
 
   if (!premiumType || !["month", "year"].includes(premiumType)) {
-    return res.status(400).json({ error: "Ongeldig premium type" });
+    return res.status(400).json({ error: "Invalid premium type" });
   }
 
   try {
     const user = await User.findById(req.userId);
-    if (!user)
-      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const now = new Date();
     let premiumEndDate =
@@ -256,23 +248,22 @@ app.post("/api/users/premium", authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message: `Premium geactiveerd tot ${premiumEndDate.toISOString()}`,
+      message: `Premium activated until ${premiumEndDate.toISOString()}`,
     });
   } catch (error) {
-    console.error("❌ Fout bij premium activeren:", error);
-    res.status(500).json({ error: "Interne serverfout" });
+    console.error("❌ Error activating premium:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Premium annuleren
+// Cancel premium
 app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user)
-      return res.status(404).json({ error: "Gebruiker niet gevonden" });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     if (!user.premium) {
-      return res.status(400).json({ error: "Geen actief premium abonnement" });
+      return res.status(400).json({ error: "No active premium subscription" });
     }
 
     user.premiumCancelPending = true;
@@ -280,15 +271,15 @@ app.post("/api/users/premium/cancel", authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message: "Premium wordt op het einde van de periode stopgezet.",
+      message: "Premium will be canceled at the end of the period.",
     });
   } catch (error) {
-    console.error("❌ Fout bij premium annuleren:", error);
-    res.status(500).json({ error: "Interne serverfout" });
+    console.error("❌ Error canceling premium:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ───── Andere routes ─────
+// ───── Other Routes ─────
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/vehicles", vehicleRoutes);
@@ -310,15 +301,15 @@ cron.schedule("0 0 * * *", async () => {
       user.premiumEndDate = null;
       user.premiumCancelPending = false;
       await user.save();
-      console.log(`⏹ Premium gedeactiveerd voor ${user._id}`);
+      console.log(`⏹ Premium deactivated for ${user._id}`);
     }
   } catch (error) {
-    console.error("❌ Cronjob fout:", error);
+    console.error("❌ Cronjob error:", error);
   }
 });
 
-// Server starten
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server draait op poort ${PORT}`);
+  console.log(`🚀 Server is running on port ${PORT}`);
 });

@@ -3,7 +3,7 @@ const router = express.Router();
 const Vehicle = require("../models/Vehicle");
 const jwt = require("jsonwebtoken");
 
-// Middleware authenticatie
+// Authentication middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   if (!authHeader) return res.status(401).json({ message: "Unauthorized" });
@@ -20,7 +20,7 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// GET alle voertuigen van ingelogde gebruiker
+// GET all vehicles of the logged-in user
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const vehicles = await Vehicle.find({ userId: req.userId });
@@ -30,18 +30,18 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// POST nieuw voertuig (voeg userId uit token toe)
+// POST new vehicle (adds userId from token)
 router.post("/", authenticateToken, async (req, res) => {
   const { brand, model, year, plate, color } = req.body;
 
   if (!brand || !model || !year || !plate) {
-    return res.status(400).json({ message: "Alle velden zijn verplicht" });
+    return res.status(400).json({ message: "All fields are required" });
   }
 
   try {
     const existing = await Vehicle.findOne({ plate });
     if (existing) {
-      return res.status(400).json({ message: "Kenteken bestaat al" });
+      return res.status(400).json({ message: "License plate already exists" });
     }
 
     const vehicle = new Vehicle({
@@ -59,15 +59,16 @@ router.post("/", authenticateToken, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-// UPDATE voertuig
+
+// UPDATE vehicle
 router.put("/:id", authenticateToken, async (req, res) => {
   try {
     const vehicle = await Vehicle.findById(req.params.id);
     if (!vehicle) {
-      return res.status(404).json({ message: "Voertuig niet gevonden" });
+      return res.status(404).json({ message: "Vehicle not found" });
     }
     if (vehicle.userId.toString() !== req.userId) {
-      return res.status(403).json({ message: "Geen toegang tot dit voertuig" });
+      return res.status(403).json({ message: "Access denied to this vehicle" });
     }
 
     const { brand, model, year, plate, color } = req.body;
@@ -85,21 +86,20 @@ router.put("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE voertuig alleen als eigenaar
+// DELETE vehicle (only if owner)
 router.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const vehicle = await Vehicle.findById(req.params.id);
     if (!vehicle) {
-      return res.status(404).json({ message: "Voertuig niet gevonden" });
+      return res.status(404).json({ message: "Vehicle not found" });
     }
     if (vehicle.userId.toString() !== req.userId) {
-      return res.status(403).json({ message: "Geen toegang tot dit voertuig" });
+      return res.status(403).json({ message: "Access denied to this vehicle" });
     }
 
-    // Vervang vehicle.remove() door dit:
     await Vehicle.deleteOne({ _id: vehicle._id });
 
-    res.json({ message: "Voertuig verwijderd" });
+    res.json({ message: "Vehicle deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

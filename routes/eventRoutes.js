@@ -1,14 +1,15 @@
 const express = require("express");
 const router = express.Router();
-const Event = require("../models/Event"); // Ensure this points to your correct Event model
+const Event = require("../models/Event"); // Make sure this points to your correct Event model
 
+// GET: Fetch all events
 router.get("/", async (req, res) => {
   try {
-    const events = await Event.find(); // Fetch all events
-    console.log("Fetched Events:", events); // Log the events to see if they are being fetched
-    res.json(events); // Send back the data in JSON format
+    const events = await Event.find(); // Fetch all events from the database
+    console.log("Fetched Events:", events); // Log events for debugging
+    res.json(events); // Return the events in JSON format
   } catch (err) {
-    console.error("Error fetching events:", err);
+    console.error("❌ Error fetching events:", err);
     res.status(500).json({ error: "Failed to fetch events" });
   }
 });

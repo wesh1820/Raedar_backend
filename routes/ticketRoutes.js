@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 
 const router = express.Router();
 
-// ✅ Middleware: JWT token valideren
+// ✅ Middleware: Validate JWT token
 const verifyToken = (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
   if (!token)
@@ -20,18 +20,18 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// ✅ GET: Haal alle tickets op voor ingelogde gebruiker
+// ✅ GET: Get all tickets for the logged-in user
 router.get("/", verifyToken, async (req, res) => {
   try {
     const tickets = await Ticket.find({ user: req.userId });
     res.status(200).json({ tickets });
   } catch (err) {
     console.error("❌ Error fetching tickets:", err);
-    res.status(500).json({ error: "Fout bij ophalen van tickets" });
+    res.status(500).json({ error: "Error fetching tickets" });
   }
 });
 
-// ✅ POST: Maak een nieuw ticket aan
+// ✅ POST: Create a new ticket
 router.post("/", verifyToken, async (req, res) => {
   const { type, price, availability, duration, latitude, longitude } = req.body;
   const userId = req.userId;
@@ -64,7 +64,7 @@ router.post("/", verifyToken, async (req, res) => {
   }
 });
 
-// ✅ PATCH: Update ticketprijs
+// ✅ PATCH: Update ticket price
 router.patch("/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   const { price } = req.body;
@@ -81,36 +81,38 @@ router.patch("/:id", verifyToken, async (req, res) => {
     res.status(200).json({ ticket: updatedTicket });
   } catch (err) {
     console.error("❌ Error updating ticket:", err);
-    res.status(500).json({ error: "Fout bij bijwerken van ticket" });
+    res.status(500).json({ error: "Error updating ticket" });
   }
 });
 
-// ✅ NIEUW: Bevestig betaling en zet bedrag in ticket.paid
+// ✅ NEW: Confirm payment and set amount in ticket.paid
 router.post("/payment/confirm", verifyToken, async (req, res) => {
   const { ticketId, amount, vehicleId } = req.body;
 
   if (!ticketId || !amount) {
-    return res.status(400).json({ error: "ticketId en amount zijn verplicht" });
+    return res.status(400).json({ error: "ticketId and amount are required" });
   }
 
   try {
     const ticket = await Ticket.findOne({ _id: ticketId, user: req.userId });
     if (!ticket) {
-      return res.status(404).json({ error: "Ticket niet gevonden" });
+      return res.status(404).json({ error: "Ticket not found" });
     }
 
     if (ticket.paid) {
-      return res.status(400).json({ error: "Dit ticket is al betaald." });
+      return res
+        .status(400)
+        .json({ error: "This ticket has already been paid." });
     }
 
     ticket.paid = amount;
     await ticket.save();
 
-    console.log(`✅ Betaling bevestigd voor ticket ${ticketId}: €${amount}`);
-    res.status(200).json({ message: "Betaling bevestigd", ticket });
+    console.log(`✅ Payment confirmed for ticket ${ticketId}: €${amount}`);
+    res.status(200).json({ message: "Payment confirmed", ticket });
   } catch (err) {
-    console.error("❌ Fout bij verwerken betaling:", err);
-    res.status(500).json({ error: "Serverfout bij betaling" });
+    console.error("❌ Error processing payment:", err);
+    res.status(500).json({ error: "Server error during payment" });
   }
 });
 
