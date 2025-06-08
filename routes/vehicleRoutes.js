@@ -96,7 +96,9 @@ router.delete("/:id", authenticateToken, async (req, res) => {
       return res.status(403).json({ message: "Geen toegang tot dit voertuig" });
     }
 
-    await vehicle.remove();
+    // Vervang vehicle.remove() door dit:
+    await Vehicle.deleteOne({ _id: vehicle._id });
+
     res.json({ message: "Voertuig verwijderd" });
   } catch (err) {
     res.status(500).json({ message: err.message });
